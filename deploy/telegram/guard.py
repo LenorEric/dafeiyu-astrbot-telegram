@@ -3,8 +3,93 @@ import logging
 import os
 import re
 import time
+from collections import OrderedDict, deque
+from datetime import datetime
+
+
+class GroupContextCache:
+    """Bounded, in-memory text context; never mixes chats or forum topics."""
+    MAX_MESSAGES = 20
+    MAX_AGE = 30 * 60
+    MAX_TOPICS = 128
+    MAX_TEXT = 800
+    MAX_TOTAL_TEXT = 8000
+
+    def __init__(self):
+        self.topics = OrderedDict()
+
+    @staticmethod
+    def key(message):
+        thread = getattr(message, 'message_thread_id', None) if getattr(message, 'is_topic_message', False) else None
+        if getattr(message.chat, 'is_forum', False) is True and thread == 1:
+            thread = None
+        return (message.chat.id, thread)
+
+    def prune(self):
+        cutoff = time.monotonic() - self.MAX_AGE
+        for key, items in list(self.topics.items()):
+            while items and items[0][0] <= cutoff:
+                items.popleft()
+            if not items:
+                del self.topics[key]
+
+    def remember(self, message):
+        self.prune()
+        text = (message.text or message.caption or '').strip()
+        if not text:
+            return False
+        sent_at = getattr(message, 'date', None)
+        if isinstance(sent_at, datetime) and time.time() - sent_at.timestamp() > self.MAX_AGE:
+            return False
+        key = self.key(message)
+        # One extra slot retains 20 prior messages when the current one is cached.
+        items = self.topics.setdefault(key, deque(maxlen=self.MAX_MESSAGES + 1))
+        message_id = getattr(message, 'message_id', None)
+        if message_id is not None and any(item[1]['message_id'] == message_id for item in items):
+            return False
+        items.append((time.monotonic(), {
+            'message_id': message_id,
+            'sender_id': str(message.from_user.id),
+            'sender_name': str(getattr(message.from_user, 'full_name', None) or getattr(message.from_user, 'username', None) or message.from_user.id)[:64],
+            'sent_at': sent_at.isoformat() if isinstance(sent_at, datetime) else None,
+            'text': text[:self.MAX_TEXT],
+        }))
+        self.topics.move_to_end(key)
+        while len(self.topics) > self.MAX_TOPICS:
+            self.topics.popitem(last=False)
+        return True
+
+    def before(self, message):
+        self.prune()
+        current_id = getattr(message, 'message_id', None)
+        result = []
+        size = 0
+        for _, item in reversed(self.topics.get(self.key(message), ())):
+            if current_id is not None and item['message_id'] is not None and item['message_id'] >= current_id:
+                continue
+            if size + len(item['text']) > self.MAX_TOTAL_TEXT:
+                break
+            result.append(dict(item))
+            size += len(item['text'])
+            if len(result) >= self.MAX_MESSAGES:
+                break
+        return list(reversed(result))
+
+
+def group_cache(adapter):
+    cache = getattr(adapter, '_dafeiyu_group_context_cache', None)
+    if cache is None:
+        cache = adapter._dafeiyu_group_context_cache = GroupContextCache()
+    return cache
 
 def install(adapter_class, owner_id, allowed_groups):
+    group_context_enabled = os.environ.get('DAFEIYU_GROUP_CONTEXT_ENABLED', '0') == '1'
+    context_debug = os.environ.get('DAFEIYU_GROUP_CONTEXT_DEBUG', '0') == '1'
+    try:
+        from astrbot.api import logger
+    except ImportError:
+        logger = logging.getLogger(__name__)
+    logger.info(f'Telegram group guard: allowed_groups={sorted(allowed_groups)}, context_enabled={group_context_enabled}, context_debug={context_debug}')
     # Redact after formatting, including exception tracebacks and child loggers.
     if not getattr(logging.Formatter, '_dafeiyu_redaction', False):
         original_format = logging.Formatter.format
@@ -20,9 +105,25 @@ def install(adapter_class, owner_id, allowed_groups):
         from voice import install_voice
         install_voice(TelegramPlatformEvent)
         async def convert(self, update, context, *args, **kwargs):
+            raw = update.message
+            recent = group_cache(self).before(raw) if group_context_enabled and raw and str(raw.chat.id) in allowed_groups else []
+            if context_debug and raw and str(raw.chat.id) in allowed_groups:
+                logger.info(f'Telegram group context snapshot: chat_id={raw.chat.id}, message_id={getattr(raw, "message_id", None)}, messages={len(recent)}')
             message = await original_convert(self, update, context, *args, **kwargs)
             if message is None: return None
-            from astrbot.core.message.components import Image, Video
+            if recent:
+                message._dafeiyu_group_context = recent
+            from astrbot.core.message.components import At, Image, Video
+            reply = getattr(raw, 'reply_to_message', None) if raw else None
+            if (raw and raw.chat.type != 'private' and reply
+                    and reply.from_user and reply.from_user.id == context.bot.id):
+                # Telegram self_id is the bot username, while Reply.sender_id
+                # is numeric. Text replies have a prefix workaround upstream;
+                # stickers/audio/photos do not. Keep the numeric quote identity
+                # and add the matching wake component for every reply type.
+                if not any(isinstance(c, At) and str(c.qq) == str(message.self_id)
+                           for c in message.message):
+                    message.message.insert(0, At(qq=message.self_id, name=context.bot.username))
             from astrbot.core.utils.astrbot_path import get_astrbot_temp_path
             from pathlib import Path
             import uuid, aiohttp
@@ -56,12 +157,19 @@ def install(adapter_class, owner_id, allowed_groups):
     original = adapter_class.message_handler
     async def guarded(self, update, context):
         m = update.message
-        if not m or not m.from_user or m.from_user.is_bot:
+        if not m or not m.from_user:
+            return
+        if m.from_user.is_bot:
+            if str(m.chat.id) in allowed_groups:
+                sender_chat = getattr(m, 'sender_chat', None)
+                logger.info(f'Telegram group guard rejected bot sender: chat_id={m.chat.id}, sender_chat_id={getattr(sender_chat, "id", None)}')
             return
         if m.chat.type == 'private':
             if str(m.chat.id) != owner_id or str(m.from_user.id) != owner_id: return
         else:
-            if str(m.chat.id) not in allowed_groups: return
+            if str(m.chat.id) not in allowed_groups:
+                logger.info(f'Telegram group guard rejected unlisted chat: chat_id={m.chat.id}')
+                return
             text = m.text or m.caption or ''
             name = context.bot.username.lower()
             reply = m.reply_to_message
@@ -79,7 +187,15 @@ def install(adapter_class, owner_id, allowed_groups):
             if album and targeted:
                 if len(albums) >= 1000: albums.clear()
                 albums[key] = now + 20
-            if not targeted and not (album and key in albums): return
+            if group_context_enabled:
+                cache = group_cache(self)
+                recorded = cache.remember(m)
+                if context_debug:
+                    logger.info(f'Telegram group context receive: chat_id={m.chat.id}, topic={cache.key(m)[1]}, message_id={getattr(m, "message_id", None)}, targeted={targeted}, cached={recorded}, cache_messages={len(cache.topics.get(cache.key(m), ()))}')
+            if not targeted and not (album and key in albums):
+                logger.debug(f'Telegram group message cached without waking bot: chat_id={m.chat.id}')
+                return
+            logger.info(f'Telegram group guard accepted targeted message: chat_id={m.chat.id}, message_id={getattr(m, "message_id", None)}')
             self._dafeiyu_albums = albums
         for field in ('voice','audio','video','video_note','document','animation','sticker'):
             media = getattr(m, field, None)

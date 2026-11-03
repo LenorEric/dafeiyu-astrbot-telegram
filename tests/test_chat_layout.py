@@ -97,6 +97,43 @@ check("tts-no-code", "print(1)" not in tts, tts)
 check("tts-keeps-punctuation", "你好" in tts and "吧。" in tts, tts)
 check("tts-pure-punct-empty", mod.make_tts_text("……") == "", repr(mod.make_tts_text("……")))
 
+# Final bubbles, rather than the complete model response, determine punctuation.
+chain = [Plain('第一句。'), Plain('第二句。'), Plain('第三句。')]
+split = mod.group_bubbles(chain, Plain, Record, 2)
+formatted = [mod.format_bubble_period(b, Plain) for b in split]
+check('single-bubble-no-period', ''.join(texts(formatted[0])) == '第一句')
+check('merged-bubble-keeps-middle-period-only', ''.join(texts(formatted[1])) == '第二句。第三句')
+check('format-does-not-mutate-model-text', chain[0].text == '第一句。')
+
+for value in ('你吃了吗？', '好呀！', '```py\nprint("好。")\n```', '`代码。`', 'https://example.com.', '省略号...'):
+    got = mod.format_bubble_period([Plain(value)], Plain)
+    check('keep-format: '+repr(value), got[0].text == value)
+for value, expected in (
+    ('先休息。明天再说。', '先休息。明天再说'),
+    ('你吃了吗？我吃了。', '你吃了吗？我吃了'),
+    ('`代码。`。', '`代码。`'),
+    ('English sentence.', 'English sentence'),
+    ('（先吃饭。等会儿再聊。）', '（先吃饭。等会儿再聊）'),
+    ('不理你了。。', '不理你了'),
+):
+    got = mod.format_bubble_period([Plain(value)], Plain)
+    check('drop-only-closing-period: '+repr(value), got[0].text == expected)
+
+inline = [Plain('前半句'), Face(), Plain('后半句。')]
+inline_out = mod.format_bubble_period(inline, Plain)
+check('inline-face-single-sentence', texts(inline_out) == ['前半句', '<face>', '后半句'])
+
+raw, intentional = mod.extract_period_intent('先吃饭。\n不理你了。[[KEEP_PERIOD]]')
+check('period-intent-consumed-before-send', raw == '先吃饭。\n不理你了。' and intentional == ['不理你了。'])
+serious = mod.format_bubble_period([Plain('不理你了。')], Plain, intentional)
+check('intentional-cold-period-preserved', serious[0].text == '不理你了。')
+mixed = mod.format_bubble_period([Plain('你说是就是。不理你了。')], Plain, intentional)
+check('marked-final-clause-in-multi-sentence-bubble', mixed[0].text == '你说是就是。不理你了。')
+ordinary = mod.format_bubble_period([Plain('先吃饭。')], Plain, intentional)
+check('intent-is-per-sentence', ordinary[0].text == '先吃饭')
+code, kept = mod.extract_period_intent('`演示。[[KEEP_PERIOD]]`')
+check('literal-control-in-code-untouched', code == '`演示。[[KEEP_PERIOD]]`' and kept == [])
+
 # 8) 音频文件校验：WAV 头通过，HTML 错误页/过小文件拒绝
 with tempfile.TemporaryDirectory() as td:
     wav = os.path.join(td, "ok.wav")

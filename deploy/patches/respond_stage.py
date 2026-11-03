@@ -11,7 +11,7 @@ from astrbot.core.platform.astr_message_event import AstrMessageEvent
 from astrbot.core.star.star_handler import EventType
 from astrbot.core.utils.path_util import path_Mapping
 
-from ..chat_layout import group_bubbles
+from ..chat_layout import format_bubble_period, group_bubbles
 from ..context import PipelineContext, call_event_hook
 from ..stage import Stage, register_stage
 
@@ -307,6 +307,11 @@ class RespondStage(Stage):
                     self.max_bubbles,
                 )
                 for index, bubble in enumerate(bubbles):
+                    if event.get_extra('_fy_bubble_period_style', False):
+                        bubble = format_bubble_period(
+                            bubble, Comp.Plain,
+                            event.get_extra('_fy_keep_final_periods', []),
+                        )
                     if index > 0:
                         i = await self._calc_comp_interval(bubble[0])
                         await asyncio.sleep(i)
@@ -359,7 +364,13 @@ class RespondStage(Stage):
                             f"error = {e}",
                             exc_info=True,
                         )
-                chain = result.derive(result.chain)
+                outgoing = result.chain
+                if event.get_extra('_fy_bubble_period_style', False):
+                    outgoing = format_bubble_period(
+                        outgoing, Comp.Plain,
+                        event.get_extra('_fy_keep_final_periods', []),
+                    )
+                chain = result.derive(outgoing)
                 if result.chain and len(result.chain) > 0:
                     try:
                         await event.send(chain)

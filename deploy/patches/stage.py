@@ -1,9 +1,11 @@
 import asyncio
+import os
 import random
 import re
 import time
 import traceback
 from collections.abc import AsyncGenerator
+from pathlib import Path
 
 from astrbot.core import file_token_service, html_renderer, logger
 from astrbot.core.message.components import At, Image, Plain, Record, Reply
@@ -14,8 +16,9 @@ from astrbot.core.platform.message_type import MessageType
 from astrbot.core.star.session_llm_manager import SessionServiceManager
 from astrbot.core.star.star import star_map
 from astrbot.core.star.star_handler import EventType, star_handlers_registry
+from astrbot.core.utils.astrbot_path import get_astrbot_data_path
 
-from ..chat_layout import is_valid_audio_file, make_tts_text
+from ..chat_layout import RareVoiceGate, is_valid_audio_file, make_tts_text
 from ..context import PipelineContext
 from ..stage import Stage, register_stage, registered_stages
 
@@ -90,13 +93,18 @@ class ResultDecorateStage(Stage):
         ]["content_cleanup_rule"]
         # 整段语音的兜底时限；TTS 卡住时必须退回文字，不能把整条回复拖死。
         tts_cfg = ctx.astrbot_config.get("provider_tts_settings", {})
+        # AstrBot removes unknown JSON settings during config normalization.
+        # Use the explicit environment switch, shared with the request hook.
+        self.rare_voice = os.environ.get('DAFEIYU_RARE_VOICE', '0') == '1'
+        self.voice_gate = RareVoiceGate(Path(get_astrbot_data_path()) / 'plugin_data/rare_voice/cooldown.json')
+        logger.info(f'TTS routing: rare_emotional_voice={self.rare_voice}, global_cooldown_seconds=600')
         try:
-            self.tts_timeout_s = max(3.0, float(tts_cfg.get("timeout", 30)))
+            self.tts_timeout_s = max(3.0, float(tts_cfg.get("timeout", 60 if self.rare_voice else 30)))
         except (TypeError, ValueError):
             self.tts_timeout_s = 30.0
         try:
             # 单次合成的文本上限；超长回复直接发文字，避免供应商截断/报错。
-            self.tts_max_chars = max(50, int(tts_cfg.get("max_chars", 600)))
+            self.tts_max_chars = max(50, int(tts_cfg.get("max_chars", 1000 if self.rare_voice else 600)))
         except (TypeError, ValueError):
             self.tts_max_chars = 600
 
@@ -298,9 +306,18 @@ class ResultDecorateStage(Stage):
                 bool(self.ctx.astrbot_config["provider_tts_settings"]["enable"])
                 and result.is_llm_result()
                 and await SessionServiceManager.should_process_tts_request(event)
-                and random.random() <= self.tts_trigger_probability
                 and tts_provider
             )
+            if should_tts and self.rare_voice:
+                if event.get_extra('_fy_voice_text_only', False):
+                    should_tts = False
+                elif event.get_extra('_fy_voice_requested', False):
+                    # User requests neither read nor update the automatic cooldown.
+                    should_tts = True
+                else:
+                    should_tts = self.voice_gate.reserve(event.get_extra('_fy_voice_emotion'))
+            elif should_tts:
+                should_tts = random.random() <= self.tts_trigger_probability
             if should_tts and not tts_provider:
                 logger.warning(
                     f"Session {event.unified_msg_origin} has no text-to-speech "
@@ -337,7 +354,8 @@ class ResultDecorateStage(Stage):
                         )
                     else:
                         try:
-                            logger.info(f"TTS request (whole reply): {tts_text[:200]}")
+                            mode = 'requested' if event.get_extra('_fy_voice_requested', False) else 'automatic'
+                            logger.info(f"TTS request: mode={mode}, chars={len(tts_text)}")
                             audio_path = await asyncio.wait_for(
                                 tts_provider.get_audio(tts_text),
                                 timeout=self.tts_timeout_s,
@@ -365,9 +383,9 @@ class ResultDecorateStage(Stage):
                             record = Record(
                                 file=url or audio_path,
                                 url=url or audio_path,
-                                text=tts_text,
+                                text='' if self.rare_voice else tts_text,
                             )
-                            if tts_settings["dual_output"]:
+                            if tts_settings["dual_output"] and not self.rare_voice:
                                 # 文字气泡 + 一条完整语音
                                 result.chain.append(record)
                             else:

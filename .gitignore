@@ -2,6 +2,7 @@ __pycache__/
 *.pyc
 *.log
 .venv/
+.runtime/
 *.bak
 .serena/
 .memory-observatory/
@@ -9,3 +10,5 @@ __pycache__/
 .env
 deploy/data/
 plugin/**/config.json
+/backups/
+/DEPLOYMENT_STATUS.md

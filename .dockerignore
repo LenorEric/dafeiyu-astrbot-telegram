@@ -7,4 +7,7 @@ deploy/.env
 **/.env
 .memory-observatory
 .venv
+.runtime
+backups
+DEPLOYMENT_STATUS.md
 plugin/**/config.json
