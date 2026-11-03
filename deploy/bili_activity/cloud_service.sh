@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Manage only the companion's Docker-gateway proxy, never AstrBot/NapCat or cron.
+# Manage only the companion's Docker-gateway proxy, never AstrBot/Telegram 适配器 or cron.
 set -euo pipefail
 action="${1:-status}"
 gateway="${2:-172.18.0.1}"
@@ -48,7 +48,7 @@ pid = owned_process()
 if action == "logs":
     print(log_file.read_text(errors="replace")[-32000:] if log_file.exists() else "No proxy log yet")
 elif action == "status":
-    print(f"Proxy process {'running pid=' + str(pid) if pid else 'not running'}; MCP and QQ readiness require separate checks")
+    print(f"Proxy process {'running pid=' + str(pid) if pid else 'not running'}; MCP and Telegram readiness require separate checks")
 elif action == "stop":
     if pid:
         os.kill(pid, signal.SIGTERM)
@@ -63,7 +63,7 @@ elif action == "stop":
         else:
             raise SystemExit("Proxy has not stopped; PID record retained for inspection")
     pid_file.unlink(missing_ok=True)
-    print("Companion proxy stopped; AstrBot, NapCat and PhoneMCP 8009 were not changed")
+    print("Companion proxy stopped; AstrBot, Telegram 适配器 and PhoneMCP 8009 were not changed")
 elif action == "start":
     if pid:
         print(f"Companion proxy already running pid={pid}")

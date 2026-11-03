@@ -1,7 +1,8 @@
+> Telegram 专用版本。本文不构成真实账号联调记录；配置与验收以部署指南和验证报告为准。
+
 # 核心补丁（随仓库提供）
 
-这些文件是 **AstrBot v4.29.0** 核心源码的修改版（TTS 补丁见
-`docs/踩坑合集.md` #15），以修改版文件的形式在 compose 里 bind-mount 进容器，
+这些文件是 **AstrBot v4.29.0** 核心源码的修改版，以修改版文件的形式构建到 Telegram 镜像中，
 升级镜像不丢补丁。
 
 - `dashscope_tts.py`：qwen-audio → WebSocket 通道；按模型能力接
@@ -25,7 +26,7 @@ SiliconFlow / MiniMax / MiMo 音色。插件的自动语音开关保持关闭，
 
 ## proactive_chat 插件补丁
 
-`proactive_chat/` 是社区插件 `astrbot_plugin_proactive_chat` v1.2.6 的两个修改版文件，
+`proactive_chat/` 是社区插件 `astrbot_plugin_proactive_chat` 固定源码基线上的修改版文件，
 补上“主动消息也能联网搜索”的工具挂载与工具循环。安装/升级注意事项见
 [`proactive_chat/README.md`](proactive_chat/README.md)。
 

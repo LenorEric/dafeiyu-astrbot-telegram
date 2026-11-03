@@ -26,8 +26,8 @@ def load(name):
 
 
 core, budget = load("core"), load("budget")
-SCOPE = "qq:FriendMessage:12345"
-OTHER = "qq:GroupMessage:12345"
+SCOPE = "telegram:FriendMessage:12345"
+OTHER = "telegram:GroupMessage:12345"
 TZ = ZoneInfo("Asia/Shanghai")
 
 

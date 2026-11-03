@@ -61,7 +61,7 @@ def group_bubbles(
     next ``Plain`` follows a non-``Plain`` component and the previous text did
     not end a sentence; otherwise a new bubble starts.
 
-    Records are always isolated: QQ delivers a voice segment as its own
+    Records are always isolated: Telegram delivers a voice segment as its own
     message.  Text bubbles are capped at *max_bubbles*; extra sentences are
     merged into the last text bubble instead of producing a wall of messages.
     """
@@ -138,10 +138,10 @@ def make_tts_text(text: str) -> str:
 
 
 def is_valid_audio_file(path: str) -> bool:
-    """Cheap decode sanity check before handing a file to the QQ adapter.
+    """Cheap decode sanity check before handing a file to the Telegram adapter.
 
     DashScope occasionally returns an HTML/JSON error body with HTTP 200.
-    Writing that to ``.wav`` and sending it makes NapCat fail silently, so the
+    Writing that to ``.wav`` and sending it makes Telegram 适配器 fail silently, so the
     caller must fall back to text instead.
     """
     try:

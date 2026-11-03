@@ -1,3 +1,5 @@
+> Telegram 专用版本。本文不构成真实账号联调记录；配置与验收以部署指南和验证报告为准。
+
 # PhoneMCP → 云端 AstrBot：本地安卓模拟器控制
 
 让大肥鱼（云端 AstrBot）通过 **MCP** 操作本地 Windows 上的雷电模拟器：
@@ -25,21 +27,6 @@ Windows 本地
 为什么需要代理：Docker 容器里的 `127.0.0.1` 指容器自身，到不了宿主的回环；
 SSH `-R` 默认也只绑宿主回环。代理把 Docker 网关地址 `172.18.0.1:8009`
 转发到宿主 `127.0.0.1:8009`，容器就能访问。
-
-## 已验证组合（2026-10-20）
-
-- LDPlayer 14.0.31（Android 14），实例 `720×1280 / 320 dpi / 30 fps`，默认 6 vCPU / 6 GB
-- PhoneMCP **v0.5.0 源码运行**（Python 3.14 venv，fastmcp 4.1.1）
-- AstrBot v4.29.0 Docker，MCP 配置走 SSE
-- 实测工具（18 个）：`list_devices` / `get_current_app` / `get_screenshot` /
-  `get_ui_elements` / `tap`（坐标点击）/ `tap_element` / `swipe` / `type_text` /
-  `press_key` / `launch_app` / `search_apps` / `listen_audio` 等
-- 中文输入：**ADBKeyboard** IME 广播（Android 14 上 PhoneMCP 自带的
-  ClipHelper `IClipboard` 旧接口已失效，回退方案不可用）
-- B 站：`tv.danmaku.bili` v9.15.0，首次启动的性别/年龄/兴趣引导已处理；
-  首页在放视频时 `uiautomator dump` 会报 `could not get idle state`，
-  用 `get_screenshot` + `tap(x,y)` 操作，搜索结果页和分享面板可正常读元素树
-- 模型：DeepSeek（实测可接受图片输入，截图能进上下文）
 
 ## 听模拟器里的声音（listen_audio）
 
@@ -81,10 +68,6 @@ v0.5.0 和 v0.3.4 都有这个问题。因此从源码运行，并在 `main.py` 
 stdout/stderr 使用 UTF-8：
 
 ```powershell
-git clone https://github.com/kengerlwl/phoneMcp.git D:\AI\PhoneMCP\src
-cd D:\AI\PhoneMCP\src
-git apply D:\GitHub\dafeiyu-astrbot\deploy\phone_mcp\patches\phone_mcp_local_20261020.patch
-
 cd D:\AI\PhoneMCP
 python -m venv venv
 .\venv\Scripts\python.exe -m pip install -r src\requirements.txt
@@ -198,10 +181,6 @@ MCP services initialization completed: 1/1 successful, 0 failed.
 .\deploy\phone_mcp\install_phone_autostart.ps1 -Server <server-ip>
 ```
 
-优先注册计划任务 `DafeiyuPhoneService`（登录时运行）；没有管理员权限时自动退回
-当前用户的“启动”文件夹，生成 `DafeiyuPhoneService.cmd`，效果相同。自启命令带
-`-RestartBot`，会重启云端 AstrBot 并跑 `heal_ws.py`，让 MCP SSE 会话重新连上。
-
 断线处理：`start_reverse_tunnel.ps1` 自带 3 秒重试循环和 `ServerAliveInterval=15`；
 AstrBot 侧对 `ClosedResourceError` 有最多 2 次自动重连。若网络长时间中断后手机工具
 仍不通，执行一次 `start_phone_service.ps1 -Server <server-ip> -RestartBot` 即可。
@@ -230,8 +209,6 @@ asyncio.run(main())
 PY
 ```
 
-QQ 实测话术（基础控制）：
-
 > 肥鱼，看看你的虚拟手机现在是什么页面，然后打开设置，告诉我屏幕上实际显示的两个选项。
 
 三条验收：模拟器画面真的变化、AstrBot 日志出现上述工具调用、回答与截图文字一致。
@@ -245,11 +222,9 @@ B 站活动验收话术：
 
 ## 8. 未来任务（每日 20:30 逛 B 站）
 
-AstrBot 的「未来任务」就是 `cron_jobs` 表里的 `active_agent` 任务。2026-10-20 已建：
-
 - 名称：`大肥鱼晚间逛B站`
 - Cron：`30 20 * * *`，时区 `Asia/Shanghai`
-- 会话：`qq:FriendMessage:<主人QQ>`（主号私聊）
+- 会话：`telegram:FriendMessage:<主人Telegram>`（主人私聊）
 - 提示词要点：结合最近聊天和长期记忆选主题（别每天同一类）→ 手机打开 B 站搜索 →
   看前三个结果 → 挑一条打开看标题/UP/简介/页面数据 → 私聊汇报，只讲实际看到的 →
   能拿分享链接就拿，拿不到直说 → 发完用 `memorize_long_term_memory` 记活动摘要，
@@ -262,7 +237,7 @@ AstrBot 的「未来任务」就是 `cron_jobs` 表里的 `active_agent` 任务�
 ```bash
 python3 - <<'PY'
 import sqlite3
-con = sqlite3.connect('/opt/dafeiyu/astrbot/data/data_v4.db')
+con = sqlite3.connect('/opt/dafeiyu/deploy/data/data_v4.db')
 for r in con.execute("select name, cron_expression, timezone, enabled, next_run_time from cron_jobs"):
     print(r)
 PY

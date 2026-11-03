@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location("bili_workshop_ops_cli", ROOT / "deploy/bili_activity/ops.py")
 ops = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(ops)
-SCOPE, OTHER = "qq:FriendMessage:12345", "qq:FriendMessage:98765"
+SCOPE, OTHER = "telegram:FriendMessage:12345", "telegram:FriendMessage:98765"
 OWN_ID, OTHER_ID, EMPTY_ID = "a" * 32, "b" * 32, "c" * 32
 
 
@@ -48,7 +48,7 @@ class WorkshopOpsTests(unittest.TestCase):
             CREATE TABLE proposals(id TEXT,action TEXT,status TEXT,created REAL,expires REAL);
             CREATE TABLE deliveries(id TEXT,kind TEXT,status TEXT,created REAL,receipt TEXT);
             CREATE TABLE goals(id TEXT,scope TEXT,title TEXT,why TEXT,status TEXT,next_step TEXT,run_id TEXT,updated_at REAL);
-            INSERT INTO goals VALUES('goal-own','qq:FriendMessage:12345','写笔记','要继续','running','完成草稿','live-run',20);
+            INSERT INTO goals VALUES('goal-own','telegram:FriendMessage:12345','写笔记','要继续','running','完成草稿','live-run',20);
             """)
             if creative:
                 db.executescript("""

@@ -5,3 +5,7 @@ __pycache__/
 *.bak
 .serena/
 .memory-observatory/
+
+.env
+deploy/data/
+plugin/**/config.json

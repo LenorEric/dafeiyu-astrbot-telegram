@@ -68,7 +68,7 @@ DEFAULTS = {
     "one_shot_verified": False,
     "device_id": "emulator-5554",
 }
-DEFAULT_DATA_DIR = "/opt/dafeiyu/astrbot/data/plugin_data/astrbot_plugin_bili_activity"
+DEFAULT_DATA_DIR = "/opt/dafeiyu/deploy/data/plugin_data/astrbot_plugin_bili_activity"
 NUMERIC_LIMITS = {
     "max_actions_per_run": (0, 10000), "max_actions_per_day": (0, 10000),
     "max_comments_per_day": (0, 10000), "max_replies_per_day": (0, 10000),
@@ -391,7 +391,7 @@ def main(argv=None):
     switches.add_argument("value", choices=["on", "off"])
     accepted = sub.add_parser("accept-one-shot")
     accepted.add_argument("--evidence", type=Path, required=True,
-                          help="JSON with run_id, read_content_verified=true, screenshot_opened=true, qq_screenshot_message_id")
+                          help="JSON with run_id, read_content_verified=true, screenshot_opened=true, telegram_screenshot_message_id")
     logs = sub.add_parser("logs")
     logs.add_argument("--lines", type=int, default=50)
     goals = sub.add_parser("goals", help="只读查看当前主人私聊的持续目标")
@@ -587,8 +587,8 @@ def main(argv=None):
         elif args.command == "accept-one-shot":
             evidence = json.loads(args.evidence.read_text(encoding="utf-8"))
             if not (evidence.get("run_id") and evidence.get("read_content_verified") is True
-                    and evidence.get("screenshot_opened") is True and evidence.get("qq_screenshot_message_id")):
-                raise ValueError("验收证据缺少实际运行 ID、内容核对或 QQ 图片打开确认/回执")
+                    and evidence.get("screenshot_opened") is True and evidence.get("telegram_screenshot_message_id")):
+                raise ValueError("验收证据缺少实际运行 ID、内容核对或 Telegram 图片打开确认/回执")
             rows = read_rows(folder, "SELECT id,status,scope,started,ended FROM runs WHERE id=?", (evidence["run_id"],))
             if not rows or rows[0]["status"] != "completed":
                 raise ValueError("运行记录不存在或未完成，不能标记验收通过")
@@ -599,14 +599,15 @@ def main(argv=None):
             for row in receipts:
                 receipt = json.loads(row["receipt"] or "null") or {}
                 meta = json.loads(row["meta"] or "null") or {}
-                if (str(receipt.get("message_id")) == str(evidence["qq_screenshot_message_id"])
-                        and receipt.get("verified") is True
-                        and receipt.get("image_readback") is True
+                if (str(receipt.get("message_id")) == str(evidence["telegram_screenshot_message_id"])
+                        and str(receipt.get("chat_id")) == run["scope"].rsplit(":", 1)[-1]
+                        and receipt.get("acknowledged") is True
+                        and bool(receipt.get("photo_file_id"))
                         and meta.get("run_id") == run["id"]
                         and meta.get("share_mode") == "autonomous"):
                     receipt_ok = True
             if not receipt_ok:
-                raise ValueError("该运行期间没有匹配的 QQ 图片回执和图片读回记录，不能标记验收通过")
+                raise ValueError("该运行期间没有匹配的 Telegram 图片 API 回执和主人确认记录，不能标记验收通过")
             control["one_shot_verified"] = True
             control["one_shot_evidence"] = evidence
         save_control(folder, control)

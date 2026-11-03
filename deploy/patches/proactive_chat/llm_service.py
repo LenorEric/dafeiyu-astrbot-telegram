@@ -145,7 +145,7 @@ class LlmService:
             from astrbot.core.astr_main_agent import _apply_web_search_tools
 
             # 主动消息没有 AstrMessageEvent，这里只需 unified_msg_origin
-            # 让 AstrBot 读取该 QQ 会话实际使用的 provider_settings。
+            # 让 AstrBot 读取该 Telegram 会话实际使用的 provider_settings。
             fake_event = SimpleNamespace(unified_msg_origin=session_id)
             await _apply_web_search_tools(fake_event, req, self.plugin.context)
             func_tool = getattr(req, "func_tool", None)

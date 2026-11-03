@@ -6,7 +6,7 @@ import traceback
 from collections.abc import AsyncGenerator
 
 from astrbot.core import file_token_service, html_renderer, logger
-from astrbot.core.message.components import At, Image, Json, Node, Plain, Record, Reply
+from astrbot.core.message.components import At, Image, Plain, Record, Reply
 from astrbot.core.message.message_event_result import ResultContentType
 from astrbot.core.pipeline.content_safety_check.stage import ContentSafetyCheckStage
 from astrbot.core.platform.astr_message_event import AstrMessageEvent
@@ -226,7 +226,7 @@ class ResultDecorateStage(Stage):
 
             # 分段回复
             if self.enable_segmented_reply and event.get_platform_name() not in [
-                "qq_official_webhook",
+
                 "weixin_official_account",
                 "dingtalk",
             ]:
@@ -318,22 +318,7 @@ class ResultDecorateStage(Stage):
             ):
                 # inject reasoning content to chain
                 reasoning_content = str(event.get_extra("_llm_reasoning_content"))
-                if event.get_platform_name() == "lark":
-                    result.chain.insert(
-                        0,
-                        Json(
-                            data={
-                                "type": "lark_collapsible_panel_reasoning",
-                                "title": "💭 Thinking",
-                                "expanded": False,
-                                "content": reasoning_content,
-                            },
-                        ),
-                    )
-                else:
-                    result.chain.insert(
-                        0, Plain(f"🤔 思考: {reasoning_content}\n\n────\n")
-                    )
+                result.chain.insert(0, Plain(f"🤔 思考: {reasoning_content}\n\n────\n"))
 
             if should_tts and tts_provider:
                 # 补丁3: 整条回复只合成一次语音。显示气泡照常分，但语音不再
@@ -446,20 +431,6 @@ class ResultDecorateStage(Stage):
                             result.chain = [Image.fromURL(url)]
                         else:
                             result.chain = [Image.fromFileSystem(url)]
-
-            # 触发转发消息
-            if event.get_platform_name() == "aiocqhttp":
-                word_cnt = 0
-                for comp in result.chain:
-                    if isinstance(comp, Plain):
-                        word_cnt += len(comp.text)
-                if word_cnt > self.forward_threshold:
-                    node = Node(
-                        uin=event.get_self_id(),
-                        name="AstrBot",
-                        content=[*result.chain],
-                    )
-                    result.chain = [node]
 
             # at 回复 / 引用回复仅适用于纯文本或图文消息
             can_decorate = all(

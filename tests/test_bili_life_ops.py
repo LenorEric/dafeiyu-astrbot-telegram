@@ -32,8 +32,8 @@ def load(name, path):
 ops = load("bili_life_ops_cli", ROOT / "deploy/bili_activity/ops.py")
 core = load(PACKAGE + ".core", PLUGIN / "core.py")
 budget = load(PACKAGE + ".budget", PLUGIN / "budget.py")
-SCOPE = "qq:FriendMessage:12345"
-OTHER = "qq:FriendMessage:98765"
+SCOPE = "telegram:FriendMessage:12345"
+OTHER = "telegram:FriendMessage:98765"
 
 
 class LifeOpsTests(unittest.TestCase):
@@ -65,7 +65,7 @@ class LifeOpsTests(unittest.TestCase):
             CREATE TABLE runs(id TEXT,status TEXT,scope TEXT,started REAL,ended REAL);
             CREATE TABLE proposals(id TEXT,action TEXT,status TEXT,created REAL,expires REAL);
             CREATE TABLE deliveries(id TEXT,kind TEXT,status TEXT,created REAL,receipt TEXT);
-            INSERT INTO runs VALUES('old','completed','qq:FriendMessage:12345',1,2);
+            INSERT INTO runs VALUES('old','completed','telegram:FriendMessage:12345',1,2);
             """)
 
     def test_missing_state_is_read_only_and_defaults_stay_disabled(self):

@@ -1,6 +1,6 @@
-"""Method reuse through the real controller and SQLite, with model/QQ substitutes.
+"""Method reuse through the real controller and SQLite, with model/Telegram substitutes.
 
-These tests establish local behavior, not real autonomous decisions or QQ receipt.
+These tests establish local behavior, not real autonomous decisions or Telegram receipt.
 """
 import asyncio
 import json

@@ -1,3 +1,5 @@
+> Telegram 专用版本。本文不构成真实账号联调记录；配置与验收以部署指南和验证报告为准。
+
 # EmotionAI v3.4：主对话去注入 + 独立情感分析
 
 上游插件：`astrbot_plugin_emotionai` v3.4（作者：腾天，仓库 `tengtian3/astrbot-plugin-emotionai`）。
@@ -11,7 +13,7 @@
 - 假助手：带 `<thought>` 的「报告前辈，星绘……」
 - 假 system：`[PROTOCOL_ENFORCEMENT] … REQUIRED ACTION: Generate XML block`
 
-模型会服从 system 级 XML 要求，主回复里出现空 ` ```xml ` 围栏；`face_convert` 只摘掉 `<thought>` 内容，剩下的围栏和「代码片段」标签被发到 QQ。旧测试记录还因此反复进入上下文。
+模型会服从 system 级 XML 要求，主回复里出现空 ` ```xml ` 围栏；`telegram_chat` 只摘掉 `<thought>` 内容，剩下的围栏和「代码片段」标签被发到 Telegram。旧测试记录还因此反复进入上下文。
 
 ## 改了什么
 
@@ -31,14 +33,14 @@
 云端插件目录：
 
 ```bash
-plugin=/opt/dafeiyu/astrbot/data/plugins/astrbot_plugin_emotionai
+plugin=/opt/dafeiyu/deploy/data/plugins/astrbot_plugin_emotionai
 ts=$(date +%Y%m%d_%H%M%S)
 cp -a "$plugin/main.py" "$plugin/main.py.bak_$ts"
 cp -a "$plugin/_conf_schema.json" "$plugin/_conf_schema.json.bak_$ts"
 install -m 644 main.py "$plugin/main.py"
 install -m 644 _conf_schema.json "$plugin/_conf_schema.json"
 # 把 config.example.json 的新键合并到
-# /opt/dafeiyu/astrbot/data/config/astrbot_plugin_emotionai_config.json
+# /opt/dafeiyu/deploy/data/config/astrbot_plugin_emotionai_config.json
 # 不要覆盖旧的好感度/管理员配置。
 docker restart astrbot
 ```
@@ -55,25 +57,10 @@ docker restart astrbot
 
 当前主聊天是 `deepseek-chat`，它没有原生 `reasoning_content`；`deepseek-reasoner` 有，但切换主聊天会改变延迟/成本/语气，所以默认不切换。原生 reasoning 只作为以后可选路径，不用于当前默认实现。
 
-## 验证记录（2026-10-29）
-
-- 云端备份：`/opt/dafeiyu/backups/emotionai_separate_20261029_225640`（首次改插件）、`/opt/dafeiyu/backups/emotionai_clean2_20261029_230628`（深度清理前）
-- 已从 conversation 2 / 5 / 6 删除旧伪造三连；全库扫描 `[PROTOCOL_ENFORCEMENT]`、`星绘`、`报告前辈`、精确假用户消息均零命中。
-- 另外清理了历史 assistant/system 消息里的空 `xml` 围栏和 `<thought>` 块（含一条只有 thought、没有可见正文的旧消息）；用户可见正文保留。
-- 历史正文里仍有一句正常的「被系统自检打断」叙述，不是伪造注入消息，未删除。
-- 插件加载成功（v3.4），OneBot v11 适配器已连接。
-- 容器内纯逻辑测试通过：旧上下文清洗、`<thought>`/空围栏清洗、JSON 解析、`process_emotional_update` 流程。
-- 真实 `deepseek-chat` 分析样例返回合法 JSON：`joy/trust/favor/intimacy`，未出现 Markdown 围栏。
-- 非空 Python 代码块在清洗测试中原样保留。
-
 ## 回滚
-
-1. 快速停用分析：`emotion_analysis_mode = "off"`，重启 AstrBot；主聊天仍会去注入，但没有情感更新。
-2. 完全回滚：恢复备份的 `main.py`、`_conf_schema.json`、`astrbot_plugin_emotionai_config.json`，重启 AstrBot。
-3. 数据库备份保留在 `/opt/dafeiyu/backups/emotionai_separate_20261029_225640`；不要用旧库覆盖新库来“撤销”已发生的情感变化。
 
 ## 注意
 
 - 上游插件升级会覆盖 `main.py`；升级后必须重新合并本目录改动，否则旧注入会回来。
 - 独立分析默认每轮多一次低 token 调用；如只需情绪状态显示、不需要更新，可设 `off`。
-- 本补丁不改变主聊天模型，也不会把 `<thought>`、XML、情感更新数值发给 QQ。
+- 本补丁不改变主聊天模型，也不会把 `<thought>`、XML、情感更新数值发给 Telegram。

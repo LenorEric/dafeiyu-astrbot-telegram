@@ -25,7 +25,7 @@ from astrbot.api.star import Context, Star, StarTools, register
 from astrbot.core.agent.tool import FunctionTool, ToolSet
 
 from .core import PUBLIC, WRITES, Store, canonical, decision, digest, quiet_now
-from .transport import MCPClient, PhoneGate, QQDelivery, ScreenCapture, TransportError
+from .transport import MCPClient, PhoneGate, TelegramDelivery, ScreenCapture, TransportError
 from .budget import Budget, BudgetExceeded
 from .agent_budget import instrument_runner
 from .planner import DEFAULTS as PLANNER_DEFAULTS, LifePlanner, validate_config as validate_planner
@@ -322,7 +322,7 @@ PROMPT = """这是你自己的B站活动，不是主人发来的新消息。沿�
 df_bili_read 只读 B 站接口，不会改变手机画面；想配手机截图时，先用 df_bili_navigate 在手机上打开目标视频并确认，再用 df_screen；如果手机不在目标页，不要用接口结果硬配一张截图。
 可继续看一段、换视频、查看UP主或翻评论。手机离线立即结束。
 想分享当前画面时先df_screen看真实截图，再df_share_screen用该snapshot_id和贴合画面的短句发送。
-截图不会自动发到QQ；没有调用分享工具就不能说已发送。没想分享时可以不发。
+截图不会自动发到Telegram；没有调用分享工具就不能说已发送。没想分享时可以不发。
 所有账号写入只用df_bili_propose提出精确对象和内容；默认等待主人回答。仅控制器按主人显式配置决定自动放行，模型不能代用户批准。
 使用df_activity_note保存看过的位置和自己的感想；不能把你自己的喜好写成主人的喜好。
 结束时简短总结实际完成和失败项，最终文本只作活动记录，不会自动发给主人。
@@ -431,7 +431,7 @@ class BiliActivity(Star):
                     "collection_management", "screenshot_enabled", "one_shot_verified"):
             if not isinstance(cfg[key], bool):
                 raise ValueError(f"{key} 必须是布尔开关")
-        if cfg["owner_scope"] and (not re.fullmatch(r"[^:]+:FriendMessage:[0-9]+", cfg["owner_scope"])
+        if cfg["owner_scope"] and (not re.fullmatch(r"telegram:FriendMessage:[0-9]+", cfg["owner_scope"])
                                   or cfg["owner_scope"].rsplit(":", 1)[-1] != str(cfg["owner_id"])):
             raise ValueError("主人私聊配置不匹配")
         if cfg["dnd_ranges"] is not None:
@@ -454,7 +454,7 @@ class BiliActivity(Star):
         return self._interactions
 
     def interaction_run(self, event):
-        return event.get_extra("df_run_id") or "qq:" + str(event.message_obj.message_id)
+        return event.get_extra("df_run_id") or event.unified_msg_origin + ":" + str(event.message_obj.message_id)
 
     def reply_watch(self):
         self.interactions()
@@ -717,7 +717,7 @@ class BiliActivity(Star):
         expected = hashlib.sha256(json.dumps([row["action"], args], sort_keys=True, ensure_ascii=False).encode()).hexdigest()
         if operation.get("found") and operation.get("fingerprint") != expected:
             raise ValueError("operation fingerprint mismatch")
-        # The companion returns only typed metadata; filter once more before QQ.
+        # The companion returns only typed metadata; filter once more before Telegram.
         summary = {"found": operation.get("found") is True,
                    "status": operation.get("status") if operation.get("status") in {"verified", "uncertain", "missing"} else "unknown",
                    "result": safe_result(operation.get("result"))}
@@ -1036,11 +1036,11 @@ class BiliActivity(Star):
         return episode
 
     def sender(self):
-        return QQDelivery(self.context, self.cfg()["owner_scope"])
+        return TelegramDelivery(self.context, self.cfg()["owner_scope"])
 
     def face_plugin(self):
         for metadata in self.context.get_all_stars():
-            if metadata.name == "astrbot_plugin_face_convert" and metadata.star_cls:
+            if metadata.name == "astrbot_plugin_telegram_chat" and metadata.star_cls:
                 instance = metadata.star_cls
                 if hasattr(instance, "_vl_describe") and hasattr(instance, "_asr_file"):
                     return instance
@@ -1467,7 +1467,7 @@ class BiliActivity(Star):
             if tool.name.startswith("bilibili_") and any(x in tool.name for x in ("reply", "follow", "favorite", "like", "coin", "delete", "send_")):
                 if not tool.name.endswith(("followings", "followers", "favorites")):
                     req.func_tool.remove_tool(tool.name)
-        req.system_prompt = (req.system_prompt or "") + "\nB站账号写入必须通过df_bili_propose提交精确参数，默认等待主人答复；仅控制器按主人显式配置判定自动执行，模型不能批准。不要通过手机点击绕过。截图分享使用df_screen及df_share_screen，不要将截图成功等同于QQ发送成功。对主人汇报B站动作时用大白话：只说成了/没成、确认了什么、没确认什么；不要念 accepted/verified/visibility/risk_code 这些内部字段，也不要用弹幕字段解释点赞。"
+        req.system_prompt = (req.system_prompt or "") + "\nB站账号写入必须通过df_bili_propose提交精确参数，默认等待主人答复；仅控制器按主人显式配置判定自动执行，模型不能批准。不要通过手机点击绕过。截图分享使用df_screen及df_share_screen，不要将截图成功等同于Telegram发送成功。对主人汇报B站动作时用大白话：只说成了/没成、确认了什么、没确认什么；不要念 accepted/verified/visibility/risk_code 这些内部字段，也不要用弹幕字段解释点赞。"
         if event.unified_msg_origin == cfg["owner_scope"]:
             if cfg["comment_learning_enabled"]:
                 req.system_prompt += self.reply_watch().context(event.unified_msg_origin, cfg)
@@ -1523,7 +1523,7 @@ class BiliActivity(Star):
                     str(event.get_sender_id()), str(message_id), original)
                 if preference:
                     self.store.queue_memory(event.unified_msg_origin,
-                        "[主人在本私聊的明确表达；来源QQ消息 " + str(message_id) + "] " + original,
+                        "[主人在本私聊的明确表达；来源Telegram消息 " + str(message_id) + "] " + original,
                         "episode:" + preference["id"])
         if SCREEN_REQUEST.fullmatch(original):
             event.stop_event()
@@ -1718,7 +1718,7 @@ class BiliActivity(Star):
 
     @filter.llm_tool(name="df_bili_propose")
     async def propose(self, event: AstrMessageEvent, action: str, arguments: str, reason: str):
-        """提出精确B站写入；默认发送给主人等真实QQ批准，显式自动模式由控制器判定。
+        """提出精确B站写入；默认发送给主人等真实Telegram批准，显式自动模式由控制器判定。
 
         Args:
             action(string): comment/reply/danmaku/like/coin/follow/unfollow/favorite_add/favorite_remove/folder_create/folder_rename/favorite_move。
@@ -1855,11 +1855,11 @@ class BiliActivity(Star):
 
     @filter.llm_tool(name="df_screen")
     async def screen(self, event: AstrMessageEvent):
-        """取得emulator-5554当前真实截图给视觉模型；这一步没有发QQ。用返回snapshot_id分享。"""
+        """取得emulator-5554当前真实截图给视觉模型；这一步没有发Telegram。用返回snapshot_id分享。"""
         shot_id, shot = await self.capture(event)
         return CallToolResult(content=[
             TextContent(type="text", text=canonical({"snapshot_id": shot_id, "captured_at": shot.captured_at,
-                "video_identity": shot.video, "video_verified": shot.video_verified, "qq_sent": False})),
+                "video_identity": shot.video, "video_verified": shot.video_verified, "telegram_sent": False})),
             ImageContent(type="image", mimeType=shot.mime_type, data=base64.b64encode(Path(shot.path).read_bytes()).decode()),
         ])
 
@@ -1895,7 +1895,7 @@ class BiliActivity(Star):
 
     @filter.llm_tool(name="df_share_screen")
     async def share_screen(self, event: AstrMessageEvent, snapshot_id: str, caption: str):
-        """把刚看过的真实截图发给主人QQ并核对回执，发送后可继续浏览。
+        """把刚看过的真实截图发给主人Telegram并核对回执，发送后可继续浏览。
 
         Args:
             snapshot_id(string): 本轮df_screen返回的截图ID，限60秒内。
@@ -2314,7 +2314,7 @@ class BiliActivity(Star):
         if action == "export":
             result = workshop.export(scope, work_id, selected_revision)
             self.store.event(scope, "work_export", {"run_id": run_id, **result})
-            return canonical({**result, "qq_file_sent": False})
+            return canonical({**result, "telegram_file_sent": False})
         key = "work:" + work_id + ":" + str(work["revision"])
         if self.store.db.execute("SELECT 1 FROM deliveries WHERE id=?", (key,)).fetchone():
             return canonical({"status": "duplicate_suppressed", "delivery_id": key})
@@ -2323,7 +2323,7 @@ class BiliActivity(Star):
         if not self.store.delivery(scope, key, "work", work["body_hash"],
                                    {"work_id": work_id, "revision": work["revision"], "run_id": run_id}, True):
             return canonical({"status": "duplicate_suppressed", "delivery_id": key})
-        # Content is an excerpt with provenance; a local export path is never a QQ file receipt.
+        # Content is an excerpt with provenance; a local export path is never a Telegram file receipt.
         text = ((caption.strip() + "\n") if caption.strip() else "") + f"《{work['title']}》·第{work['revision']}版（摘录）\n"
         text += work["body"][:1600] + ("\n……（摘录结束）" if len(work["body"]) > 1600 else "")
         try:
@@ -2337,7 +2337,7 @@ class BiliActivity(Star):
         self.store.delivered(key, receipt)
         self.store.event(scope, "work_share_receipt", {"run_id": run_id, "work_id": work_id,
             "revision": work["revision"], "receipt": receipt})
-        return canonical({"receipt": receipt, "delivery_id": key, "qq_file_sent": False,
+        return canonical({"receipt": receipt, "delivery_id": key, "telegram_file_sent": False,
                           "status": "sent" if receipt and receipt.get("message_id") else "uncertain"})
 
     @filter.llm_tool(name="df_recall")

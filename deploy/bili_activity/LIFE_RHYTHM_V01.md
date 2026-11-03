@@ -1,3 +1,5 @@
+> Telegram 专用版本。本文不构成真实账号联调记录；配置与验收以部署指南和验证报告为准。
+
 # 生活节律 v0.1
 
 2026-11-01，本地实现，默认关闭；未部署或修改真实配置。接续[进化清单](../../docs/进化清单.md)第4步。
@@ -11,7 +13,7 @@
 | 起床后2小时 | 既有研究/写作候选加6分，保留原有进展、重复、审批排除规则 |
 | 白天 | 原生活决策照常选择研究、写作或探索 |
 | 睡前整理时段 | 只允许已有作品的离线写作；没有合适作品则休息，不启动新的资料探索 |
-| 睡眠时段 | 只保存休息选择；不启动 Agent、占用手机、预留活动额度、发送 QQ 或创建经历/长期记忆 |
+| 睡眠时段 | 只保存休息选择；不启动 Agent、占用手机、预留活动额度、发送 Telegram 或创建经历/长期记忆 |
 | 近期活动较多 | 在滚动窗口内累积已结束运行的经过时间；不足1分钟余量时休息，时间自然移出窗口后重新判断 |
 
 失败、取消、超时等已结束的运行也占用过时间；重叠区间只计一次。只统计同一会话，忽略未结束、未来、倒置或无效区间，不把预留额度当成已发生的活动。不在午夜清零近期活动，原上海自然日预算依旧独立执行。
@@ -22,7 +24,7 @@
 
 ## 开关和配置
 
-旧 `control.json` 缺键时采用下表默认值，不覆盖自定义字段。开启还需原 `life_enabled`、`life_decision_enabled` 和一次性活动验收；不会顺带开启活动、周期、写操作或 QQ 投递。
+旧 `control.json` 缺键时采用下表默认值，不覆盖自定义字段。开启还需原 `life_enabled`、`life_decision_enabled` 和一次性活动验收；不会顺带开启活动、周期、写操作或 Telegram 投递。
 
 | 配置 | 默认 | 范围 |
 | --- | --- | --- |
@@ -67,7 +69,7 @@ python3 /opt/dafeiyu/tools/bili_activity/ops.py life-decisions --limit 8
 
 ```powershell
 $env:Path='C:\Program Files\Git\bin;' + $env:Path
-$testPython='C:\Users\ACER\AppData\Local\Temp\dafeiyu-rhythm-venv\Scripts\python.exe'
+$testPython='<本机Python路径>'
 & $testPython -B -m unittest discover -s tests -p 'test_bili_rhythm.py' -v
 & $testPython -B -m unittest discover -s tests -p 'test_bili_*.py' -v
 & $testPython -B -m unittest discover -s tests -p 'test_memory_*.py' -v
@@ -86,15 +88,13 @@ node tests/memory_observatory_browser.mjs --spawn-demo
 | JS语法与 `git diff --check` | 通过 |
 | 受保护代码/人格/手机启动脚本 diff | 空 |
 
-跳过项与基线一致：6项需要ffmpeg，1项需要Windows符号链接权限，4项仅支持Linux安全导出。准备耗时边界补测前全量455项通过；补充该测试与边界检查后复跑最终456项通过。
-
-[虚构场景截图](../memory_observatory/assets/room-rhythm-v01.png) · [浏览器结果](../memory_observatory/assets/room-rhythm-v01-results.json)。原始基线和最终回归输出分别保留在本机临时目录 `dafeiyu-rhythm-baseline-clean.log` 与 `dafeiyu-rhythm-final.log`，不含真实账号数据。
+[虚构场景截图](../memory_observatory/assets/room-rhythm-v01.png) · 。原始基线和最终回归输出分别保留在本机临时目录 `dafeiyu-rhythm-baseline-clean.log` 与 `dafeiyu-rhythm-final.log`，不含真实账号数据。
 
 关键反例覆盖：夜间零模型/设备/投递/额度/记忆；没有作品时不造睡前写作；真实运行时间重叠去重、跨午夜不清零、重启保留；其他会话和未来/未完成记录不计入；暂停/DND/主人隔离不被节律绕过；准备耗时跨过休息边界时不启动工作；开关关闭恢复原行为；读取状态与房间不改库；无效CLI参数不落盘、元数据保留。
 
 ## 尚未验证与现场验收
 
-真实长期作息效果、模型表达、QQ、云端运行以及本阶段Linux/WSL为 UNVERIFIED。窗口内经过时间不等于专注时长，首版不学习个人生物钟或推断情绪。
+真实长期作息效果、模型表达、Telegram、云端运行以及本阶段Linux/WSL为 UNVERIFIED。窗口内经过时间不等于专注时长，首版不学习个人生物钟或推断情绪。
 
 主人后续可在独立测试状态中核对：白天继续既有目标；睡前只续写已有作品；睡眠时段无模型/设备/消息；积累活动后的留白；暂停/DND仍优先。再在低额度、公开写关闭的条件下明确部署并开启，观察一次跨日/重启后的选择与记录是否一致。
 

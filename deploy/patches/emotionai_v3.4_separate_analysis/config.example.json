@@ -4,7 +4,7 @@
     "favour_max": 100,
     "change_min": -10,
     "change_max": 5,
-    "admin_qq_list": [],
+    "admin_user_ids": [],
     "plugin_priority": 100000,
     "emotion_analysis_mode": "separate",
     "emotion_analysis_provider_id": "",

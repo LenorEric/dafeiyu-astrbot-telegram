@@ -279,7 +279,7 @@ class LifeState:
     def record_episode(self, scope, *, kind, source_id, evidence, interpretation=None,
                        run_id=None, goal_id=None, subject_kind="agent", subject_id="", supersedes_id=None):
         if subject_kind not in {"agent", "system"}:
-            raise ValueError("user preference requires an authenticated QQ message")
+            raise ValueError("user preference requires an authenticated Telegram message")
         return self._record_episode(scope, kind=kind, source_id=source_id, evidence=evidence,
                                     interpretation=interpretation, run_id=run_id, goal_id=goal_id,
                                     subject_kind=subject_kind, subject_id=subject_id, supersedes_id=supersedes_id)
@@ -323,7 +323,7 @@ class LifeState:
     def record_user_preference(self, scope, actor_id, event_id, text):
         """Trusted event-handler adapter only; never expose this as an Agent tool."""
         actor_id = str(actor_id)
-        if not re.fullmatch(r"[^:]+:FriendMessage:[0-9]+", scope) or scope.rsplit(":", 1)[-1] != actor_id:
+        if not re.fullmatch(r"telegram:FriendMessage:[0-9]+", scope) or scope.rsplit(":", 1)[-1] != actor_id:
             raise ValueError("preference message must belong to the configured private session")
         # Ordinary chat may be empty, long or lack a transport message ID.
         # It must continue normally; only bounded, attributable statements
@@ -341,7 +341,7 @@ class LifeState:
         if not topic or any(word in topic for word in ("吗", "么", "如果", "的话", "可以")):
             return None
         polarity = -1 if match.group(1) in {"不喜欢", "讨厌"} else 1
-        return self._record_episode(scope, kind="explicit_preference", source_id="qq:" + event_id,
+        return self._record_episode(scope, kind="explicit_preference", source_id=scope + ":" + event_id,
                                     subject_kind="user", subject_id=actor_id,
                                     evidence={"message_id": event_id, "actor_id": actor_id, "text": text},
                                     interpretation={"interest": {"topic": topic, "polarity": polarity}})

@@ -19,8 +19,8 @@ SUPPORTED_VERSION = "2.7.0-beta.2"
 MAX_RECORDS = 500
 ATOM_KINDS = {"episodic": "episode", "factual": "knowledge", "preference": "preference",
               "planned": "plan", "relational": "relation", "unknown": "unclassified"}
-DEFAULT_DB = "/opt/dafeiyu/astrbot/data/plugin_data/astrbot_plugin_livingmemory/livingmemory.db"
-DEFAULT_METADATA = "/opt/dafeiyu/astrbot/data/plugins/astrbot_plugin_livingmemory/metadata.yaml"
+DEFAULT_DB = "/opt/dafeiyu/deploy/data/plugin_data/astrbot_plugin_livingmemory/livingmemory.db"
+DEFAULT_METADATA = "/opt/dafeiyu/deploy/data/plugins/astrbot_plugin_livingmemory/metadata.yaml"
 
 
 class SourceError(ValueError):

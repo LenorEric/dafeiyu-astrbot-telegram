@@ -98,7 +98,7 @@ def coordinated_send(method):
             complete(api, ticket, "uncertain")
             raise
         else:
-            # Community API reports a bool, not a OneBot message ID or readback.
+            # Community API reports a bool, not a Telegram Bot API message ID or readback.
             complete(api, ticket, "reported" if result is True else "uncertain")
             return result
         finally:

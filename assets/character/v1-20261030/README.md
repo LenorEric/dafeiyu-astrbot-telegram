@@ -1,12 +1,10 @@
-# 大肥鱼 · 已确认的房间角色与动画素材
+> Telegram 专用版本。本文不构成真实账号联调记录；配置与验收以部署指南和验证报告为准。
 
-2026-10-30。主人已确认尾巴修订 v3；以该形象制作的六组动作已接入 [房间与页面 v0.2](../../../deploy/memory_observatory/ROOM_V02.md)。
+# 大肥鱼 · 已确认的房间角色与动画素材
 
 ![正面、侧面、背面：尾巴修订候选](dafeiyu-turnaround-tail-v3.png)
 
 ## 尾巴修订
-
-主人指出初版尾巴，尤其背面结构有问题。2026-10-30 使用内置 imagegen 局部重绘两轮：
 
 - `dafeiyu-turnaround-tail-v2.png`：移除叶脉状细线，统一宽鲸尾与浅色腹面；尾巴朝角色左侧弯，
   因而正面在画面右侧露出、背面在画面左侧露出。此轮背面的尾鳍仍过度缩拢，保留作过程对照。
@@ -26,21 +24,10 @@
 
 ## 生成与参考
 
-- 生成方式：内置 imagegen，依据参考图重新生成三视图，未使用百炼 CLI。
-- 完整生成提示词：[PROMPT.txt](PROMPT.txt)。
-- 输出：`dafeiyu-turnaround-v1.png`，1536 × 1024；已目视检查三视图、文字、脚部、尾巴与裁切情况。
-- 主参考：作者 **YunYueSama**，仓库 <https://github.com/YunYueSama/codex-deepseek-pet>。
-- 标准图来源：<https://github.com/YunYueSama/codex-deepseek-pet/blob/main/design/character-standard.png>，2026-10-30 获取。
-- 参考说明：<https://github.com/YunYueSama/codex-deepseek-pet/blob/main/docs/角色设定.md>。
-- 原参考原样保存在 [reference/yunyuesama-character-standard.png](reference/yunyuesama-character-standard.png)。
-- 保留上游完整许可：[reference/UPSTREAM-LICENSE.txt](reference/UPSTREAM-LICENSE.txt)。
-
 **修改说明：**本候选由本项目依据上游标准图重新生成，调整了三视图排版、线条与展示配色，
 不是上游作者交付的新原画，不代表上游作者或 DeepSeek 官方认可。
 上游许可只涵盖作者有权授权的贡献，不扩大底层第三方参考内容的权利；
 素材归属说明见 <https://github.com/YunYueSama/codex-deepseek-pet/blob/main/ASSET_LICENSE.md>。
-
-本仓库已有 `assets/avatars/v3-20261025` 立绘未替换；此版本按用户本轮指定的社区 Q 版方向设计。
 
 ## 网页实现对照
 

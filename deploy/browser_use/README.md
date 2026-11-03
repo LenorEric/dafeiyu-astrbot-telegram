@@ -1,3 +1,5 @@
+> Telegram 专用版本。本文不构成真实账号联调记录；配置与验收以部署指南和验证报告为准。
+
 # 🌐 Browser Use → 云端 AstrBot：只读网页任务
 
 让大肥鱼在 Windows 本机的独立 Chrome 里浏览、搜索、提取网页信息，再通过 MCP 接进云端 AstrBot。

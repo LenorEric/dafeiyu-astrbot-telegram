@@ -1,0 +1,7 @@
+name: astrbot_plugin_telegram_chat
+display_name: 大肥鱼 Telegram 聊天
+desc: Telegram 媒体理解、Unicode 表情、身份隔离与会话语音控制
+version: v2.0.0
+author: dafeiyu-tools
+support_platforms:
+  - telegram

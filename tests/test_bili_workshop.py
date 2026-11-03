@@ -25,7 +25,7 @@ for name in ("core", "workshop"):
     spec.loader.exec_module(module)
     globals()[name] = module
 
-SCOPE, OTHER = "qq:FriendMessage:12345", "qq:GroupMessage:12345"
+SCOPE, OTHER = "telegram:FriendMessage:12345", "telegram:GroupMessage:12345"
 
 
 class WorkshopTests(unittest.TestCase):

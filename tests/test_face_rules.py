@@ -13,7 +13,7 @@ import sys
 import types
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MAIN = os.path.join(ROOT, "plugin", "astrbot_plugin_face_convert", "main.py")
+MAIN = os.path.join(ROOT, "plugin", "astrbot_plugin_telegram_chat", "main.py")
 
 
 def _stub(name, **attrs):
@@ -94,7 +94,7 @@ def check(name, cond, detail=""):
 
 # 与插件里保持一致的请求词守卫
 REQ = re.compile(r"重发|再发|再说|再听|再看|发一遍|发一张|换一张|重新发|发个")
-HEDGE = mod.FaceConvertPlugin.HEDGE_RE
+HEDGE = mod.TelegramChatPlugin.HEDGE_RE
 
 
 def scrub(text):
@@ -131,7 +131,7 @@ check("path linux", P("file:///tmp/a.mp3") == "/tmp/a.mp3", P("file:///tmp/a.mp3
 check("path http", P("https://x/y.mp3") == "https://x/y.mp3", P("https://x/y.mp3"))
 
 # 5) 中文标点归一：顿号当逗号用 / 角括号引号
-NORM = mod.FaceConvertPlugin._normalize_punctuation
+NORM = mod.TelegramChatPlugin._normalize_punctuation
 for src, want in (
     # 分句连接词：必须改成逗号
     ("视频本身我这边没声音、也只看得到画面。", "视频本身我这边没声音，也只看得到画面。"),
@@ -155,7 +155,7 @@ for src, want in (
     check("punct: " + src, got == want, repr(got))
 
 # 6) [NO_REPLY] 只在整条回复就是暗号时生效
-NO_REPLY = mod.FaceConvertPlugin.NO_REPLY_RE
+NO_REPLY = mod.TelegramChatPlugin.NO_REPLY_RE
 for s, want in (
     ("[NO_REPLY]", True),
     ("【NO_REPLY】", True),
@@ -184,7 +184,7 @@ class _Resp:
         self.completion_text = text
 
 
-plugin = mod.FaceConvertPlugin(None)
+plugin = mod.TelegramChatPlugin(None)
 for src in (
     "((a+b)) 是合法表达式",
     "结果是 ((a+b))*c。",

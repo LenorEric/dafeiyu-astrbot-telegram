@@ -1,4 +1,4 @@
-"""Local-only media integration: real ffmpeg, no QQ or Bili account calls."""
+"""Local-only media integration: real ffmpeg, no Telegram or Bili account calls."""
 import asyncio
 import base64
 import importlib.util

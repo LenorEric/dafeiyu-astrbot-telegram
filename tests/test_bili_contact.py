@@ -1,4 +1,4 @@
-"""No real QQ: shared accounting, lifetime boundaries and source integration."""
+"""No real Telegram: shared accounting, lifetime boundaries and source integration."""
 import asyncio
 import importlib
 import json
@@ -106,7 +106,7 @@ class ContactTests(unittest.TestCase):
         with self.assertRaisesRegex(PermissionError, "主人刚在聊天"):
             self.reserve("two")
         self.now += 301
-        self.ledger.owner_message(SCOPE, "human", self.now)  # QQ replay is not a fresh response.
+        self.ledger.owner_message(SCOPE, "human", self.now)  # Telegram replay is not a fresh response.
         self.reserve("two")
 
     def test_cancel_before_dispatch_releases_capacity_after_dispatch_does_not(self):
@@ -147,9 +147,9 @@ class ContactTests(unittest.TestCase):
 
     def test_scope_isolation_and_redacted_status(self):
         self.sent("one")
-        self.assertEqual(self.ledger.status("qq:FriendMessage:999", self.cfg, self.now)["recent"], [])
+        self.assertEqual(self.ledger.status("telegram:FriendMessage:999", self.cfg, self.now)["recent"], [])
         with self.assertRaises(PermissionError):
-            self.ledger.check("qq:GroupMessage:12345", self.cfg, self.now)
+            self.ledger.check("telegram:GroupMessage:12345", self.cfg, self.now)
         status = json.dumps(self.ledger.status(SCOPE, self.cfg, self.now))
         self.assertNotIn("fingerprint", status)
         self.assertNotIn('"text"', status)

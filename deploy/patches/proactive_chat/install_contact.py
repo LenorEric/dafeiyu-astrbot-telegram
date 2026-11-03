@@ -38,7 +38,7 @@ def check(plugin_dir):
         desired = signature(HERE / source)
         if current == desired:
             state = "current"
-        elif current == manifest["expected_base_sha256"].get(rel):
+        elif current in {manifest["expected_base_sha256"].get(rel), manifest.get("telegram_base_sha256", {}).get(rel)}:
             state = "install"
         else:
             raise ValueError(f"source mismatch: {rel}; no files changed")

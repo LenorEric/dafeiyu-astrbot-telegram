@@ -1,6 +1,6 @@
 """Exercise real plugin methods with local transport/model substitutes.
 
-These tests do not assert live QQ delivery or a production deployment.
+These tests do not assert live Telegram delivery or a production deployment.
 """
 import asyncio
 import base64

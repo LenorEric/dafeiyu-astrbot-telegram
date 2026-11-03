@@ -8,8 +8,8 @@ import json
 import shutil
 from pathlib import Path
 
-CONFIG = Path("/opt/dafeiyu/astrbot/data/mcp_server.json")
-BACKUP = Path("/opt/dafeiyu/astrbot/data/mcp_server.json.bak_browser_20261020")
+CONFIG = Path("/opt/dafeiyu/deploy/data/mcp_server.json")
+BACKUP = Path("/opt/dafeiyu/deploy/data/mcp_server.json.bak_browser_20261020")
 ENTRY = {
     "url": "http://172.18.0.1:8010/Browser",
     "transport": "sse",

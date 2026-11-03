@@ -1,3 +1,5 @@
+> Telegram 专用版本。本文不构成真实账号联调记录；配置与验收以部署指南和验证报告为准。
+
 # proactive_chat 联网与主动联系协调补丁
 
 对应插件：`astrbot_plugin_proactive_chat`（AGPL-3.0）。旧文档标注 v1.2.6，
@@ -19,7 +21,7 @@
   - `invoke_provider()` 透传 `tool_calls_result`（兼容旧 Provider 的签名裁剪逻辑保持不变）。
 - `llm_service.py`
   - `attach_web_search_tools()`：复用 AstrBot 的 `_apply_web_search_tools()`，
-    按当前 QQ 会话的 `provider_settings` 挂载搜索工具；
+    按当前 Telegram 会话的 `provider_settings` 挂载搜索工具；
   - `run_tool_loop()`：执行模型请求的工具调用，把结果作为 `contexts` 重问，
     最多 3 轮；最终仍只把正文交给主动消息发送流程。
 
@@ -30,7 +32,7 @@
 
 `contact_bridge.py` 连接生活插件的共享账本，默认关闭；`llm_service.py` 生成前预检，
 `sender_service.py` 在整次发送前预留、每次派发前复查。TTS/分段只算一次联系。
-结果只记社区发送器报告，不冒充独立 QQ 回读。原内部传输兜底逻辑保留。
+结果只记社区发送器报告，不冒充独立 Telegram 回读。原内部传输兜底逻辑保留。
 配置、状态语义、限制和真实 smoke 见 [CONTACT_V01.md](../../bili_activity/CONTACT_V01.md)。
 
 sender 源码固定于[上游提交 2dab585](https://github.com/Pancakes-Labs/astrbot_plugin_proactive_chat/tree/2dab58514e0a2055400ed3bf7b3907ae684c0c54)。
@@ -38,9 +40,6 @@ sender 源码固定于[上游提交 2dab585](https://github.com/Pancakes-Labs/as
 这是指定基线的增量安装器，不是适配任意社区版本的新装器。
 
 ## 安装 / 升级后检查
-
-2026-10-30 已在云端安装；备份 `.dafeiyu-contact-backup-20261029T163946620609Z`。以下为可复现步骤。
-先确认标准 AstrBot data/plugins 与 plugin_data 布局。默认只检查；版本不匹配时不生成备份、不修改目标文件。不要绕过哈希检查强行覆盖。
 
 ```bash
 python install_contact.py --plugin-dir <现有社区插件目录>

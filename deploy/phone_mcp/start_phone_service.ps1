@@ -223,7 +223,7 @@ exit $rc
 #    needs a fresh connection on the AstrBot side.
 if ($RestartBot) {
     Write-Log "Restarting cloud AstrBot to refresh the MCP session"
-    $remote = "cd /opt/dafeiyu && docker restart astrbot >/dev/null && sleep 30 && python3 heal_ws.py"
+    $remote = "cd /opt/dafeiyu/deploy && docker restart astrbot >/dev/null"
     try {
         & ssh.exe -i $Key -o BatchMode=yes -o ConnectTimeout=15 "$User@$Server" $remote 2>$null | Out-Null
         if ($LASTEXITCODE -eq 0) {

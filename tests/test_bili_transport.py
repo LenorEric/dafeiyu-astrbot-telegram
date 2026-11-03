@@ -1,6 +1,6 @@
-"""Offline transport regression: real image bytes, MCP protocol, OneBot doubles.
+"""Offline transport regression: real image bytes, MCP protocol, Telegram Bot API doubles.
 
-This suite does not claim a live PhoneMCP or QQ delivery.
+This suite does not claim a live PhoneMCP or Telegram delivery.
 Run: .venv/bin/python tests/test_bili_transport.py
 """
 import asyncio
@@ -52,32 +52,19 @@ class FakeMCP:
 
 class FakeBot:
     def __init__(self, readback=None, send_error=None, read_error=None):
-        self.calls = []
-        self.readback = readback
-        self.send_error = send_error
-        self.read_error = read_error
-
-    async def call_action(self, action, **args):
-        self.calls.append((action, args))
-        if action == "send_private_msg":
-            if self.send_error:
-                raise self.send_error
-            return {"status": "ok", "retcode": 0, "data": {"message_id": 42}}
-        if action == "get_msg":
-            if self.read_error:
-                raise self.read_error
-            if self.readback is not None:
-                return self.readback
-            return {
-                "message_id": 42, "message_type": "private", "target_id": 123,
-                "message": [{"type": "image", "data": {"file": "file-id.jpg"}}],
-            }
-        raise AssertionError(action)
+        self.calls=[]; self.readback=readback; self.send_error=send_error
+    async def send_message(self, **args): return await self.send('text',args)
+    async def send_photo(self, **args): return await self.send('photo',args)
+    async def send(self, kind, args):
+        self.calls.append((kind,args))
+        if self.send_error: raise self.send_error
+        return SimpleNamespace(message_id=42, chat=SimpleNamespace(id=(self.readback or {}).get('target_id',123)),
+                               photo=[] if self.readback else [SimpleNamespace(file_id='photo-id')])
 
 
 def delivery(bot):
-    context = SimpleNamespace(get_platform_inst=lambda _: SimpleNamespace(bot=bot))
-    return transport.QQDelivery(context, "qq:FriendMessage:123", timeout=0.2)
+    context = SimpleNamespace(get_platform_inst=lambda _: SimpleNamespace(client=bot))
+    return transport.TelegramDelivery(context, "telegram:FriendMessage:123", timeout=0.2)
 
 
 class ImageTests(unittest.TestCase):
@@ -236,52 +223,39 @@ class AsyncTests(unittest.IsolatedAsyncioTestCase):
             ])
         self.assertEqual(peak, 1)
 
-    async def test_receipt_includes_real_image_send_and_readback(self):
-        bot = FakeBot()
+    async def test_photo_acknowledgement_is_not_read_receipt(self):
+        bot=FakeBot()
         with tempfile.TemporaryDirectory() as folder:
-            path = Path(folder, "current.png")
-            path.write_bytes(png())
-            receipt = await delivery(bot).send("qq:FriendMessage:123", "看到这帧啦", path)
-        self.assertTrue(receipt["acknowledged"])
-        self.assertTrue(receipt["image_readback"])
-        self.assertTrue(receipt["readback_verified"])
-        self.assertFalse(receipt["recipient_confirmed"])
-        self.assertEqual([x[0] for x in bot.calls], ["send_private_msg", "get_msg"])
-        sent_image = bot.calls[0][1]["message"][1]["data"]["file"]
-        self.assertTrue(sent_image.startswith("base64://"))
-        encoded = base64.b64decode(sent_image.removeprefix("base64://"))
-        self.assertEqual(Image.open(io.BytesIO(encoded)).size, (720, 1280))
+            path=Path(folder,'current.png');path.write_bytes(png())
+            receipt=await delivery(bot).send('telegram:FriendMessage:123','hello',path)
+        self.assertTrue(receipt['acknowledged'])
+        self.assertEqual(receipt['photo_file_id'],'photo-id')
+        self.assertFalse(receipt['recipient_confirmed'])
+        self.assertFalse(receipt['readback_supported'])
+        self.assertEqual(Image.open(io.BytesIO(bot.calls[0][1]['photo'])).size,(720,1280))
 
     async def test_send_timeout_never_retries(self):
         bot = FakeBot(send_error=TimeoutError())
         with self.assertRaises(transport.DeliveryUnknown):
-            await delivery(bot).send("qq:FriendMessage:123", "hello")
+            await delivery(bot).send("telegram:FriendMessage:123", "hello")
         self.assertEqual(len(bot.calls), 1)
 
-    async def test_readback_failure_retains_ack_and_only_retries_get(self):
-        bot = FakeBot(read_error=TimeoutError())
-        receipt = await delivery(bot).send("qq:FriendMessage:123", "hello")
-        self.assertTrue(receipt["acknowledged"])
-        self.assertFalse(receipt["verified"])
-        self.assertEqual([x[0] for x in bot.calls], ["send_private_msg", "get_msg", "get_msg"])
+    async def test_long_text_is_not_truncated(self):
+        bot=FakeBot();text='鲸🐳'*3000
+        receipt=await delivery(bot).send('telegram:FriendMessage:123',text)
+        self.assertEqual(''.join(args['text'] for _,args in bot.calls),text)
+        self.assertEqual(len(receipt['message_ids']),3)
 
-    async def test_wrong_recipient_and_missing_image_fail_readback(self):
-        for readback in (
-            {"message_id": 42, "target_id": 999, "message": []},
-            {"message_id": 43, "target_id": 123, "message": []},
-            {"message_id": 42, "target_id": 123, "message": [{"type": "text", "data": {"text": "ok"}}]},
-        ):
-            with self.subTest(readback=readback), tempfile.TemporaryDirectory() as folder:
-                path = Path(folder, "current.png")
-                path.write_bytes(png())
-                receipt = await delivery(FakeBot(readback=readback)).send(
-                    "qq:FriendMessage:123", "hi", path,
-                )
-                self.assertFalse(receipt["verified"])
+    async def test_wrong_recipient_or_missing_photo_is_uncertain(self):
+        for data in ({'target_id':999},{'target_id':123}):
+            with tempfile.TemporaryDirectory() as folder:
+                path=Path(folder,'x.png');path.write_bytes(png())
+                with self.assertRaises(transport.DeliveryUnknown):
+                    await delivery(FakeBot(readback=data)).send('telegram:FriendMessage:123','hi',path)
 
     async def test_owner_scope_required_before_any_send(self):
         bot = FakeBot()
-        for scope in ("qq:GroupMessage:123", "qq:FriendMessage:456"):
+        for scope in ("telegram:GroupMessage:123", "telegram:FriendMessage:456"):
             with self.assertRaises(PermissionError):
                 await delivery(bot).send(scope, "hello")
         self.assertEqual(bot.calls, [])
@@ -292,7 +266,7 @@ class AsyncTests(unittest.IsolatedAsyncioTestCase):
             path = Path(folder, "current.png")
             path.write_text("screenshot success")
             with self.assertRaises(transport.TransportError):
-                await delivery(bot).send("qq:FriendMessage:123", "hello", path)
+                await delivery(bot).send("telegram:FriendMessage:123", "hello", path)
         self.assertEqual(bot.calls, [])
 
     async def test_json_call_accepts_structured_and_text_json(self):

@@ -1,4 +1,4 @@
-"""Durable goal/evidence regressions, independent of QQ, models and Bilibili."""
+"""Durable goal/evidence regressions, independent of Telegram, models and Bilibili."""
 from __future__ import annotations
 
 import importlib.util
@@ -21,7 +21,7 @@ spec = importlib.util.spec_from_file_location(package.__name__ + ".core", PLUGIN
 core = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = core
 spec.loader.exec_module(core)
-SCOPE, OTHER = "qq:FriendMessage:12345", "qq:GroupMessage:12345"
+SCOPE, OTHER = "telegram:FriendMessage:12345", "telegram:GroupMessage:12345"
 
 
 class LifeStateTests(unittest.TestCase):
@@ -264,10 +264,10 @@ class LifeStateTests(unittest.TestCase):
     def test_only_authenticated_explicit_messages_become_user_preference(self):
         for message in ("可以", "可以收藏", "我喜欢建造游戏吗", "他说我喜欢游戏", "我喜欢的话再买", "引用：我喜欢建造游戏"):
             self.assertIsNone(self.life.record_user_preference(SCOPE, "12345", message, message))
-        explicit = self.life.record_user_preference(SCOPE, "12345", "qq1", "我喜欢建造游戏。")
+        explicit = self.life.record_user_preference(SCOPE, "12345", "tg1", "我喜欢建造游戏。")
         self.assertEqual(explicit["subject_kind"], "user")
-        self.assertEqual(explicit["evidence"]["message_id"], "qq1")
-        self.assertEqual(self.life.record_user_preference(SCOPE, "12345", "qq1", "我喜欢建造游戏。")["id"], explicit["id"])
+        self.assertEqual(explicit["evidence"]["message_id"], "tg1")
+        self.assertEqual(self.life.record_user_preference(SCOPE, "12345", "tg1", "我喜欢建造游戏。")["id"], explicit["id"])
         self.assertEqual(self.life.interests(SCOPE, "user")[0]["topic"], "建造游戏")
         self.assertEqual(self.life.interests(SCOPE, "agent"), [])
         with self.assertRaises(ValueError):

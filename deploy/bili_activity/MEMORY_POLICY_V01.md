@@ -1,3 +1,5 @@
+> Telegram 专用版本。本文不构成真实账号联调记录；配置与验收以部署指南和验证报告为准。
+
 # 经历记忆 v0.1：巩固与渐忘
 
 本地实现、默认关闭、未部署。此阶段改变大肥鱼生活经历的默认检索与长期记忆入队策略；不是全库删除器，也不是人的神经系统。真实 LivingMemory 写入、召回效果与长期运行尚未验证。
@@ -32,7 +34,7 @@
 - 本版自动巩固只处理**有实际视频读取支持的自身兴趣**。先核验 interest 所指的 video/video_note 存在于同一会话、有画面观察或字幕、标识一致、未被修订；模型运行总结不算来源。
 - 同一主题按视频 bvid 判重；同视频不同分P、重述、反复查看都不是独立证据。同一视频采用最近立场；不同视频证据有冲突时不生成稳定立场快照。
 - 累积 **2 / 4 / 8 个不同视频**时各可形成一份有日期和来源的快照。每个会话/主题/立场/档位只有一个稳定队列键，每会话至少间隔24小时才能新建下一份。档位封顶8，避免无限堆叠。
-- 只在已有 `flush_memory` 入口尝试入队，工具缺失/停用不创建新条目；不新增定时器、模型、外部请求或QQ消息。`enabled=false` 不生成/派发新的巩固快照。
+- 只在已有 `flush_memory` 入口尝试入队，工具缺失/停用不创建新条目；不新增定时器、模型、外部请求或Telegram消息。`enabled=false` 不生成/派发新的巩固快照。
 - 使用真正的主人目标事件调用 LivingMemory，身份/会话不匹配不派发。发送前再检查开关和来源；失效 pending 标为 `stale`；条件领取确保并发调用只派发一次。
 - 只有 `memorized is True` 记 `saved`；这是**工具确认，不是独立回读或可召回证明**。异常/取消记 `uncertain`，否定结果记 `failed`；均不自动重试。重启仍沿用 Store 的 sending→uncertain 恢复。
 - `memory_consolidation_queued` 事件仅记本地ID/来源ID；`memory_consolidation_result` 记状态及符合字符白名单的上游ID。事件不记录正文、完整响应、URL或异常文本。
@@ -65,7 +67,7 @@ Windows 临时测试环境沿用仓库现有依赖，无新增运行时依赖。
 
 ```powershell
 $env:Path='C:\Program Files\Git\bin;' + $env:Path
-$testPython='C:\Users\ACER\AppData\Local\Temp\dafeiyu-rhythm-venv\Scripts\python.exe'
+$testPython='<本机Python路径>'
 & $testPython -B -m unittest discover -s tests -p 'test_bili_memory_policy.py' -v
 & $testPython -B -m unittest discover -s tests -p 'test_bili_*.py' -v
 ```
@@ -87,8 +89,8 @@ $testPython='C:\Users\ACER\AppData\Local\Temp\dafeiyu-rhythm-venv\Scripts\python
 1. 在隔离测试会话/人格开启本策略，确认实际 `memorize_long_term_memory` 接口兼容；只读核对工具回执ID是否出现在同一会话/人格的 LivingMemory 记录中。
 2. 用两段不同内容留下实际读取与自身兴趣；同一视频重复读取不新增独立证据。检查快照来源，确认不含对主人偏好的猜测。
 3. 用测试库的历史时间验证细节→概要→淡出；按ID能取原始证据，未完成任务仍能找到来源。不要修改真实经历时间来做测试。
-4. 关闭开关，确认无新巩固派发且原查询恢复；不确定结果需人工核账，不补发。保持QQ分享和公开账号写入关闭即可完成记忆验收。
+4. 关闭开关，确认无新巩固派发且原查询恢复；不确定结果需人工核账，不补发。保持Telegram分享和公开账号写入关闭即可完成记忆验收。
 
-真实上游写入/检索、QQ表达、长期效果、Linux均 **UNVERIFIED**。本地策略不限制 LivingMemory 独立召回已存内容；也不把星海模拟、图上大小或角色动画当成真实巩固。候选/状态最多扫描500条，默认查询从原查询最近50条筛选；大量记录时不承诺覆盖全部历史。更广泛的经历主题归纳、上游历史快照修订和图上真实生命周期展示留待后续。
+真实上游写入/检索、Telegram表达、长期效果、Linux均 **UNVERIFIED**。本地策略不限制 LivingMemory 独立召回已存内容；也不把星海模拟、图上大小或角色动画当成真实巩固。候选/状态最多扫描500条，默认查询从原查询最近50条筛选；大量记录时不承诺覆盖全部历史。更广泛的经历主题归纳、上游历史快照修订和图上真实生命周期展示留待后续。
 
 改动仅 `memory_policy.py`、`main.py`、`ops.py`、新增测试及说明文档；无数据库迁移、无新依赖、不 push、不部署、不改真实配置。
