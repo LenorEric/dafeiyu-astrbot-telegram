@@ -10,7 +10,7 @@ import json
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-CONFIG = "/opt/dafeiyu/astrbot/data/cmd_config.json"
+CONFIG = "/opt/dafeiyu/deploy/data/cmd_config.json"
 API_URL = (
     "https://dashscope.aliyuncs.com/api/v1/services/aigc/"
     "multimodal-generation/generation"

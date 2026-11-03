@@ -1,4 +1,4 @@
-"""PhoneMCP image transfer and OneBot receipts, with no account credentials in logs."""
+"""PhoneMCP image transfer and Telegram Bot API receipts, with no account credentials in logs."""
 from __future__ import annotations
 
 import asyncio
@@ -34,7 +34,7 @@ class DeliveryUnknown(TransportError):
 
 
 class DeliveryRejected(TransportError):
-    """OneBot explicitly rejected the send."""
+    """Telegram Bot API explicitly rejected the send."""
 
 
 class MCPClient:
@@ -291,136 +291,55 @@ class ScreenCapture:
                 path.unlink()
 
 
-def _onebot_data(value):
-    if not isinstance(value, dict):
-        raise TransportError("OneBot returned no structured response")
-    if value.get("status") in {"failed", "error"} or value.get("retcode", 0) not in (0, None):
-        raise DeliveryRejected("OneBot 拒绝发送或读取消息")
-    return value.get("data", value)
-
-
-def _message_id(data):
-    if not isinstance(data, dict):
-        return None
-    value = data.get("message_id")
-    if isinstance(value, bool) or value in (None, "", 0, "0"):
-        return None
-    return str(value)
-
-
-def _image_present(message):
-    if isinstance(message, list):
-        return any(
-            isinstance(segment, dict) and segment.get("type") == "image"
-            and isinstance(segment.get("data"), dict)
-            and bool(segment["data"].get("file") or segment["data"].get("url"))
-            for segment in message
-        )
-    if isinstance(message, str):
-        return re.search(r"\[CQ:image,[^\]]*(?:file|url)=[^\],]+", message) is not None
-    return False
-
-
-class QQDelivery:
-    """Use AstrBot's existing OneBot bot and inspect its actual send response."""
-
-    def __init__(self, context, owner_scope: str, timeout=20):
+class TelegramDelivery:
+    """API acknowledgement is not a read receipt. Never retry uncertain sends."""
+    def __init__(self, context, owner_scope, timeout=20):
         self.context, self.owner_scope, self.timeout = context, owner_scope, timeout
         self._target(owner_scope)
 
     def _target(self, scope):
-        pieces = scope.split(":", 2)
-        if (
-            scope != self.owner_scope or len(pieces) != 3
-            or pieces[1] != "FriendMessage" or not pieces[2].isdigit()
-        ):
-            raise PermissionError("截图和主动消息仅允许发送到配置的主人私聊")
-        return pieces[0], int(pieces[2])
+        parts = scope.split(':')
+        if scope != self.owner_scope or len(parts) != 3 or parts[0] != 'telegram' or parts[1] != 'FriendMessage' or not parts[2].isdigit() or int(parts[2]) <= 0:
+            raise PermissionError('仅允许已配置的主人私聊')
+        return parts[0], int(parts[2])
 
-    async def send(self, scope: str, text: str, image_path=None):
+    async def send(self, scope, text, image_path=None):
         platform_id, target = self._target(scope)
-        platform = self.context.get_platform_inst(platform_id)
-        bot = getattr(platform, "bot", None)
-        if bot is None or not hasattr(bot, "call_action"):
-            raise TransportError("未找到可用的 QQ OneBot 连接")
-        message = []
-        if text:
-            message.append({"type": "text", "data": {"text": str(text)[:2000]}})
+        bot = getattr(self.context.get_platform_inst(platform_id), 'client', None)
+        if bot is None:
+            raise TransportError('Telegram 客户端未就绪')
+        raw = None
         if image_path is not None:
             path = Path(image_path)
             if not path.is_absolute() or not path.is_file() or path.stat().st_size > 1_000_000:
-                raise TransportError("云端截图文件无效或超过发送大小限制")
-            raw = await asyncio.to_thread(path.read_bytes)
-            # Reject accidental text/base64/path files before sending.
+                raise TransportError('图片无效或超限')
+            raw = path.read_bytes()
             try:
-                with Image.open(io.BytesIO(raw)) as image:
-                    image.verify()
+                with Image.open(io.BytesIO(raw)) as image: image.verify()
             except (OSError, ValueError):
-                raise TransportError("待发送文件不是可打开的图片") from None
-            message.append({
-                "type": "image",
-                "data": {"file": "base64://" + base64.b64encode(raw).decode("ascii")},
-            })
-        if not message:
-            raise ValueError("empty message")
-
+                raise TransportError('图片格式无效') from None
+        if not text and raw is None: raise ValueError('empty message')
+        ids, photo_id = [], None
+        async def accept(coro):
+            message = await asyncio.wait_for(coro, self.timeout)
+            if not message or str(message.chat.id) != str(target) or not message.message_id:
+                raise DeliveryUnknown('Telegram 回执不匹配')
+            ids.append(str(message.message_id))
+            return message
         try:
-            response = await asyncio.wait_for(
-                bot.call_action("send_private_msg", user_id=target, message=message),
-                self.timeout,
-            )
-            data = _onebot_data(response)
-        except asyncio.CancelledError:
-            raise
-        except DeliveryRejected:
-            raise
+            if raw is not None:
+                msg = await accept(bot.send_photo(chat_id=target, photo=raw, caption=text if len(text) <= 1024 else None))
+                if not msg.photo: raise DeliveryUnknown('图片回执缺失')
+                photo_id = msg.photo[-1].file_id
+                if len(text) <= 1024: text = ''
+            # Conservative limit leaves room for astral Unicode characters.
+            for offset in range(0, len(text), 2000):
+                await accept(bot.send_message(chat_id=target, text=text[offset:offset+2000]))
+        except asyncio.CancelledError: raise
         except Exception as exc:
-            raise DeliveryUnknown(
-                f"QQ 发送结果不确定（{type(exc).__name__}），已停止自动重发"
-            ) from None
-        mid = _message_id(data)
-        if not mid:
-            raise DeliveryUnknown("QQ 未返回 message_id，已停止自动重发")
-        receipt = {
-            "message_id": mid, "scope": scope, "acknowledged": True,
-            "sent_at": time.time(), "image_readback": False,
-            "readback_verified": False, "verified": False,
-            "recipient_confirmed": False,
-        }
-        # GETs are read-only and can be retried once; the send above cannot.
-        for attempt in range(2):
-            try:
-                value = await asyncio.wait_for(
-                    bot.call_action("get_msg", message_id=int(mid) if mid.lstrip("-").isdigit() else mid),
-                    self.timeout,
-                )
-                readback = _onebot_data(value)
-                if not isinstance(readback, dict) or _message_id(readback) != mid:
-                    receipt["readback_error"] = "message_id_mismatch"
-                    break
-                if readback.get("message_type") not in (None, "private"):
-                    receipt["readback_error"] = "unexpected_message_type"
-                    break
-                # NapCat versions differ in which destination field is exposed.
-                destination = readback.get("target_id", readback.get("peer_id"))
-                if destination is not None and str(destination) != str(target):
-                    receipt["readback_error"] = "recipient_mismatch"
-                    break
-                receipt["image_readback"] = _image_present(readback.get("message"))
-                receipt["readback_verified"] = (
-                    image_path is None or receipt["image_readback"]
-                )
-                receipt["verified"] = receipt["readback_verified"]
-                receipt["readback_target_verified"] = destination is not None
-                if not receipt["verified"]:
-                    receipt["readback_error"] = "image_segment_missing"
-                break
-            except asyncio.CancelledError:
-                raise
-            except Exception as exc:
-                receipt["readback_error"] = type(exc).__name__
-                if attempt == 0:
-                    await asyncio.sleep(0.25)
-        # verified refers to the OneBot record. Only the user's client can
-        # establish that the delivered picture actually opens on their QQ.
-        return receipt
+            if type(exc).__name__ in {'Forbidden', 'BadRequest', 'InvalidToken'} and not ids:
+                raise DeliveryRejected('Telegram 拒绝发送') from None
+            raise DeliveryUnknown('Telegram 发送不确定；禁止自动重发；已确认消息: '+','.join(ids)) from None
+        return {'message_id':ids[0], 'message_ids':ids, 'chat_id':str(target), 'scope':scope,
+                'acknowledged':True, 'photo_file_id':photo_id, 'sent_at':time.time(),
+                'recipient_confirmed':False, 'readback_supported':False}

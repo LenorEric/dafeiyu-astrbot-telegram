@@ -1,116 +1,53 @@
-# ☁️ 云上安家 · Docker 部署套件
+# Telegram 部署
 
-> 把大肥鱼从 Windows 桌面搬进一台 Linux 云服务器，7×24 在线。
-> 本目录是这次迁移沉淀下来的可复用套件（已在 2C4G / Ubuntu 24.04 实弹演练）。
+## 必需条件
 
-## 架构
+Docker Compose、可出站访问 `api.telegram.org` 和模型 API 的网络、BotFather 创建的机器人 token、主人数字用户 ID。不要使用用户名作为权限凭据。
 
-```
-QQ 用户 ⇄ 腾讯服务器 ⇄ NapCat(Docker) ⇄ WebSocket(6199) ⇄ AstrBot(Docker) ⇄ DeepSeek / 百炼 / 硅基流动
-```
+在仓库根目录执行：
 
-- 两个容器在同一个 compose 网络里，NapCat 通过 `ws://astrbot:6199/ws` 反向连接 AstrBot
-- 四个核心补丁（TTS WebSocket、整段语音/分泡、气泡发送节奏、布局工具）用
-  **bind-mount** 接入容器，升级镜像不丢补丁
-- 嵌入 provider 从本地 Ollama 切到**硅基流动 bge-m3**（同模型，向量余弦 0.9999+，零重嵌）
-
-## 目录约定
-
-```
-/opt/dafeiyu/
-├── compose.yaml        # 编排（基于本目录的 compose）
-├── Dockerfile          # 官方镜像 + edge-tts / imageio-ffmpeg
-├── patches/            # 四个核心补丁（从旧机 core 提取 + 分泡/整段语音）
-├── astrbot/data/       # 旧机 core/data（排除 temp / logs / *.bak_*）
-├── napcat/config|qq/   # NapCat 配置与登录态
-├── napcat/machine-id   # 可选：固定的 machine-id（启用前手动创建）
-├── backups/            # 每日滚动备份
-└── incoming/           # 迁移时的一次性上传暂存
+```sh
+cp deploy/.env.example deploy/.env
+chmod 600 deploy/.env
+# 在本机编辑器中填写 deploy/.env，不要把凭证贴进聊天或日志。
+docker compose -f deploy/compose.yaml up -d --build
 ```
 
-## 迁移步骤（要点）
+工作目录必须保留完整仓库：镜像从 `deploy/Dockerfile` 构建，数据位于 `deploy/data`。面板仅绑定本机 6185；远程使用 SSH 隧道。首次启动后设置强面板密码。
 
-1. **旧机停服**：先停看门狗，再停 AstrBot / NapCat（避免同 QQ 双登互踢），
-   然后打包 `core/data`（排除 `temp` / `logs` / `*.bak_*`，26MB 左右）
-2. **服务器**：装 Docker；国内拉镜像需配置 registry mirror（如 `docker.1panel.live`，
-   以当时可用为准）
-3. **构建镜像**：`docker compose build`（补 edge-tts / imageio-ffmpeg）
-4. **起 AstrBot** → 灌数据 → 起 NapCat → 打开 WebUI（6099 端口）扫码登录小号
-5. **切嵌入**：运行 `apply_sf_embedding.py`（自动从插件配置读 key，幂等）
-6. **安全组**：开放 6185（AstrBot 面板）与 6099（NapCat WebUI）
-7. **备份**：`backup.sh` + cron；另可用本地脚本定期把最新备份拉回电脑
+`TELEGRAM_BOT_TOKEN`、`TELEGRAM_OWNER_ID` 必填；`DEEPSEEK_API_KEY` 用于默认对话模型。`TELEGRAM_ALLOWED_GROUPS` 是逗号分隔的负数群 ID，留空禁用群聊。加入群不会自动授权，必须由部署者更新此列表并重建容器。不要把 token 写到命令行参数。
 
-## 踩过的坑
+启动器先生成配置，再安装访问保护，保护初始化失败则停止启动。已有不同平台配置会报冲突；不会自动导入旧数据。首次安装复制仓库插件，后续保留已安装插件及用户配置；升级插件请停容器、备份数据后手动同步对应插件目录，再重启。
 
-- **快速登录变量名**：Docker 入口脚本读的是 `ACCOUNT`（`qq --no-sandbox -q $ACCOUNT`），不是 `NAPCAT_ACCOUNT`；
-  再配 `NAPCAT_QUICK_ACCOUNT` 让 Worker 重启后自动尝试快速登录。容器**重建**会丢快速登录记录（设备指纹变），
-  改配置优先 `docker restart` 或 WebUI，别频繁 `up -d` 重建。
-- **设备名/指纹每次重扫都在变**：QQ 认设备靠「设备名 + 指纹」。容器重建时 hostname 默认变成新容器 ID，
-  `/etc/machine-id` 也会重新生成，QQ 会把这次登录当成新设备，风控加码、更容易再掉线。
-  compose 已固定 `hostname: dafeiyu-napcat`；想连 machine-id 一起固定（可选，社区经验）：
-  1. 先在宿主机执行 `cat /proc/sys/kernel/random/uuid > /opt/dafeiyu/napcat/machine-id`
-  2. 取消 compose 里 `machine-id:/etc/machine-id:ro` 那行注释
-  3. 重建一次容器并重扫一次码；之后设备名与指纹保持不变
+## 机器人初始化
 
-  **注意**：bind 源文件必须先存在，Docker 遇到不存在的源会建成目录，容器会起不来。
-- **QQ 登录态不可跨平台迁移**：Linux NapCat 必须重新扫码一次
-- **双登互踢**：旧机自启项（AstrBot Launcher / 启动大肥鱼QQ）务必停用
-- **升级覆盖补丁**：核心补丁不要改镜像，bind-mount 挂进去
-- **嵌入别重跑**：同款 bge-m3 的向量互相兼容，不需要重建索引
-  （验证法：取一条旧向量与云端新嵌入算余弦，≈1 即可）
-- `data/` 里可能混着旧机的 `site-packages` 残留，可忽略
+1. 在 BotFather `/newbot` 创建机器人；设置名称、简介和头像。
+2. 用 Telegram 客户端或可信的 ID 查询方式获取自己的数字用户 ID，配置为主人 ID。
+3. 主人先打开机器人私聊并点击 Start，然后发送文字。机器人不能主动建立私聊。
+4. 将机器人加入所需群，配置群 ID。默认保留 BotFather 隐私模式，仅响应 @ 或回复机器人。话题群按话题隔离。
+5. 非主人私聊、未允许群、其他机器人的消息均被拒绝；群中不开放主人专属审批和工具权限。
 
-## 版本与升级
+同一 token 只运行一个长轮询实例。已有 Webhook 时，先在自己的部署环境取消 Webhook，再启动轮询，不同时运行两条更新消费链路。
 
-- 本套件钉死已验证组合：**AstrBot `soulter/astrbot:v4.29.0`** +
-  **NapCat 镜像 `mlikiowa/napcat-docker:v4.18.37`**（`Dockerfile` 与 `compose.yaml` 两处）。
-  升级时：改两处 tag → `docker compose build && docker compose up -d` →
-  **重新对照 `patches/` 的补丁在新版是否仍适用**（补丁是核心源码的修改版，版本不匹配行为会变）。
-- 只要"基础聊天"（不玩百炼语音 / 不挂 TTS 补丁）：删掉 compose 里两条 `patches/...` 的
-  bind-mount 即可，其余照常。补丁文件随仓库提供（`patches/`，附来源与 AGPL-3.0 说明）。
+## 模型及扩展
 
-## 安全默认
+面板配置 DeepSeek `https://api.deepseek.com/v1`、`deepseek-chat` 为对话模型。百炼视觉 `qwen3-vl-plus`、ASR `qwen3-asr-flash`、TTS 和音色须单独配置；`DASHSCOPE_API_KEY` 提供媒体理解凭证。TTS 音色在百炼控制台创建后填入提供商配置。缺少凭证时只反馈无法识别，不编造媒体内容。
 
-- 模板默认把 AstrBot 面板（6185）与 NapCat WebUI（6099）都绑在 **127.0.0.1**，远程走 SSH 隧道：
-  `ssh -L 6185:127.0.0.1:6185 -L 6099:127.0.0.1:6099 root@<服务器>`，
-  浏览器开 `http://127.0.0.1:6185`；扫码登录 NapCat 时同样走隧道打开 `http://127.0.0.1:6099`。
-- 确需公网直连：改回 `"6185:6185"` / `"6099:6099"` 并配置安全组，同时务必改强密码。
+长期记忆安装 livingmemory，并在面板选择 bge-m3 嵌入提供商（Ollama 或兼容托管服务）。主动联系安装 proactive_chat 后按其文档配置主人会话。手机、浏览器、B站伴随服务分别按子目录文档配置；外部账号写入默认需要主人审批，不因 Telegram 迁移自动开启。
 
-## 备份与恢复
+主人会话为 `telegram:FriendMessage:<用户ID>`；群和话题会话使用 `/sid` 实际返回值，不手工猜测。日程、记忆和权限必须使用同一会话标识。生活节律沿用 Asia/Shanghai。
 
-`backup.sh` 的行为：
-- 备份前**短暂停掉 astrbot 容器**（SQLite 在写入中直接打包可能拿到不一致快照），打完立刻拉起；
-- 先写临时包、成功后才改正式名；失败写 `backups/backup.log` 且非 0 退出；
-- 备份内容：`astrbot/data` + `napcat/config` + `compose.yaml` + `Dockerfile` + `patches/` + `heal_ws.py`（恢复所需全带）；
-- **拉起后自动跑 `heal_ws.py`** 自愈 WebSocket（实测 AstrBot 重启后 NapCat 的 WS 不会自己回来）；
-  平时若发现"发消息没反应"，手动跑一次 `python3 /opt/dafeiyu/heal_ws.py` 即可（不重启 QQ、不扫码）。
-  它只看 AstrBot 容器内 6199 有没有 ESTABLISHED 连接（拿不到才退回日志先后顺序），
-  只拨指向 AstrBot 的那条客户端并保留原 `enable`；没修好返回非零。
-- **恢复失败也非 0 退出**：拉起失败、容器不是 Running、`heal_ws.py` 报错或 30 秒内没重连，
-  都会记 `[ERROR]` 并返回非零；被 Ctrl-C/SIGTERM 打断也走同一条恢复路径。
-  备份前容器本来就是停的，则跳过停止/恢复，不会顺手把它拉起来。
+## 限制与诊断
 
-恢复：`docker compose stop` → 在 `/opt/dafeiyu/` 解包（`tar -xzf ... -C /opt/dafeiyu`）→
-`docker compose up -d`；NapCat 起好后如未登录，按二维码重扫。
+媒体默认最多下载 20 MiB。静态贴纸作为图片处理，动画贴纸仅使用缩略图；上传音频经 AstrBot/FFmpeg 转换。API 回执不等于已读，不存在任意历史消息回读接口。发送超时或部分成功后禁止自动重发。
 
-## 插件运行参数（可选）
+- 401：检查 token，在 BotFather 撤销后安全更新配置。
+- 403：检查主人是否已 Start、机器人是否被屏蔽或移出群。
+- 409：停止重复实例，检查已有 Webhook。
+- 网络失败：检查 DNS、出站 HTTPS、代理和 CA；保持 TLS 校验，勿使用不明 API 镜像。
 
-在 `astrbot/data/plugins/astrbot_plugin_face_convert/` 下放 `config.json` 可覆盖默认值：
+`docker compose -f deploy/compose.yaml logs --tail 100 astrbot` 查看脱敏日志。容器进程存在不代表收发链路已验证。真实验收依次测试文字、群触发、图片、语音、视频和主人截图确认。
 
-```json
-{"hedge_eraser": true, "face_cooldown_minutes": 10, "max_media_mb": 80,
- "video_max_duration_s": 300, "video_max_frames": 16, "video_audio_chunk_s": 60,
- "video_timeout_s": 300, "vl_timeout_s": 60, "asr_timeout_s": 60,
- "max_concurrent_media": 1, "video_workers": 2, "media_queue_timeout_s": 10}
-```
+备份需停止数据写入再打包 `deploy/data`、部署配置和补丁。配置包含凭证，备份按敏感文件保护，禁止上传公开位置。恢复到独立目录并确认无其他实例使用相同 token 后启动。
 
-`hedge_eraser=false` 可整体关闭"嘴硬橡皮擦"；含"重发/再说一遍"等请求词的回复本来就永不误删。
-
-旧配置不会自动改写，请合并更新后重载插件或重启 AstrBot。详见 [3～5 分钟视频识别](../docs/视频识别.md)。
-
-## 手机控制（PhoneMCP + 本地模拟器）
-
-`phone_mcp/` 提供“云端 AstrBot 操作本地雷电模拟器”的完整接线：
-PhoneMCP 跑在 Windows、ADB 只连本机、SSH 反向隧道回云端，再由
-`phone_mcp_proxy.py` 把 Docker 网关桥接到隧道入口。包含源码启动脚本、
-UTF-8 补丁和 `mcp_server.json` 示例。详见 [phone_mcp/README.md](phone_mcp/README.md)。
+备份命令：在完整仓库根目录运行 `bash deploy/backup.sh "$PWD"`。恢复前停止机器人，在仓库根目录解压备份；文件路径包含 `deploy/data` 与配套插件和补丁，不包含另行管理的 `.env` 文件。恢复后安全填写 `.env` 并重新启动。备份保留最近七份，恢复启动失败返回非零。

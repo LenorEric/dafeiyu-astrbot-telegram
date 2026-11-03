@@ -1,3 +1,5 @@
+> Telegram 专用版本。本文不构成真实账号联调记录；配置与验收以部署指南和验证报告为准。
+
 # 近况回顾与自我表达 v0.1
 
 2026-11-02，本地实现、默认关闭、未部署。第六阶段为大肥鱼提供有来源的近况回顾，让现有模型沿用现有人格自然表达；不另造情绪分数、固定口头禅或一套人格。
@@ -13,7 +15,7 @@
 | 原生 Agent / on_llm_request | 在真实人格、已有情绪和会话上下文后追加资料；前台私聊和生活轮次共用一个入口 |
 | LivingMemory / 经历记忆 | 保留现有写入与遗忘策略；本回顾不直接写记忆或强化次数，不当成新经历 |
 
-只读 `self_expression.py` 不创建表，不改变目标/作品/运行状态，不调用模型、设备、网络或QQ发送。`memory_policy.py` 将已有兴趣来源校验抽为 `observed_interests()`，供原巩固逻辑与本阶段共用；原有28项记忆策略测试包含在最终回归中。
+只读 `self_expression.py` 不创建表，不改变目标/作品/运行状态，不调用模型、设备、网络或Telegram发送。`memory_policy.py` 将已有兴趣来源校验抽为 `observed_interests()`，供原巩固逻辑与本阶段共用；原有28项记忆策略测试包含在最终回归中。
 
 ## 回顾内容
 
@@ -82,7 +84,7 @@ python3 ops.py --data-dir <测试数据目录> switch self_expression_enabled of
 
 ```powershell
 $env:Path='C:\Program Files\Git\bin;' + $env:Path
-$testPython='C:\Users\ACER\AppData\Local\Temp\dafeiyu-rhythm-venv\Scripts\python.exe'
+$testPython='<本机Python路径>'
 & $testPython -B -m unittest discover -s tests -p 'test_bili_self_expression.py' -v
 & $testPython -B -m unittest discover -s tests -p 'test_bili_*.py' -v
 git diff --check
@@ -97,13 +99,13 @@ git diff --check
 | `git diff --check` | 通过；只有既有 Git 换行转换提示，无空白错误 |
 | 受保护模块、人格、手机启动脚本 diff | 空 |
 
-11个跳过与基线一致：6项缺ffmpeg、1项Windows符号链接权限、4项Linux限定安全导出。全部使用临时库、fake/mock和本地测试服务，没有真实B站/QQ/模型调用。日志保留在本机临时目录 `dafeiyu-self-expression-baseline.log`、`dafeiyu-self-expression-focused.log`、`dafeiyu-self-expression-final.log`。
+11个跳过与基线一致：6项缺ffmpeg、1项Windows符号链接权限、4项Linux限定安全导出。全部使用临时库、fake/mock和本地测试服务，没有真实B站/Telegram/模型调用。日志保留在本机临时目录 `dafeiyu-self-expression-baseline.log`、`dafeiyu-self-expression-focused.log`、`dafeiyu-self-expression-final.log`。
 
 反例覆盖：单次/重复/分P不构造变化，两期来源与时间边界，矛盾/无近期记录/用户偏好/外会话/未来/修订来源的保守处理；意图不当完成、完成运行不当完成目标、作品头版本与来源失效；错误自述不当中断原因；反复查看全库数据不变；缺省关闭、开关回退、不扩写权限；主人与背景轮次检查、DND/暂停、公开回复隔离；原生 Agent 钩子保留人格/已有情绪并在执行前注入资料。
 
 ## 尚未验证
 
-真实 AstrBot 注册与模型生成、QQ表达、EmotionAI/LivingMemory 在线联动、长期使用和 Linux **UNVERIFIED**。本阶段未跑 WSL；上一阶段已确认其 Python 缺少 mcp。未调用真实账户、未改云端或生产配置、未 push/部署。
+真实 AstrBot 注册与模型生成、Telegram表达、EmotionAI/LivingMemory 在线联动、长期使用和 Linux **UNVERIFIED**。本阶段未跑 WSL；上一阶段已确认其 Python 缺少 mcp。未调用真实账户、未改云端或生产配置、未 push/部署。
 
 扫描和输出都有上限：兴趣来源复用最近500条未被修订经历；每个研究目标最多检查50条来源、作品最多50条检查记录；中断查看最近12条已结束运行。条数达到截断条件时标注覆盖限制；窗口没有结果不证明历史上没有发生。
 

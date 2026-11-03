@@ -1,4 +1,4 @@
-"""Offline interaction contracts: real controller/SQLite/Executor, fake Bili/QQ."""
+"""Offline interaction contracts: real controller/SQLite/Executor, fake Bili/Telegram."""
 import asyncio
 import copy
 import json

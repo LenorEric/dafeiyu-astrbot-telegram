@@ -3,7 +3,7 @@
     [string]$Server,
     [string]$User = "root",
     [string]$Key = "$env:USERPROFILE\.ssh\ecs_dafeiyu",
-    [string]$Python = "C:\Users\ACER\miniconda3\envs\browser-use\python.exe",
+    [string]$Python = "python",
     [string]$RuntimeDir = "D:\AI\BrowserUse",
     [int]$Port = 8010,
     [switch]$NoCloudProxy,
@@ -179,7 +179,7 @@ fi
 # 4. 可选：重启 AstrBot 刷新 SSE 会话
 if ($RestartBot) {
     Write-Log "Restarting cloud AstrBot to refresh the MCP session"
-    $remote = "cd /opt/dafeiyu && docker restart astrbot >/dev/null && sleep 30 && python3 heal_ws.py"
+    $remote = "cd /opt/dafeiyu/deploy && docker restart astrbot >/dev/null"
     try {
         & ssh.exe -i $Key -o BatchMode=yes -o ConnectTimeout=15 "${User}@${Server}" $remote 2>$null | Out-Null
         if ($LASTEXITCODE -eq 0) {

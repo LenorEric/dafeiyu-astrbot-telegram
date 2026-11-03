@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location("bili_method_ops_cli", ROOT / "deploy/bili_activity/ops.py")
 ops = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(ops)
-SCOPE, OTHER = "qq:FriendMessage:12345", "qq:FriendMessage:98765"
+SCOPE, OTHER = "telegram:FriendMessage:12345", "telegram:FriendMessage:98765"
 OWN_ID, OTHER_ID, RETIRED_ID = "a" * 32, "b" * 32, "c" * 32
 GOAL, NEXT_GOAL, OTHER_GOAL = "d" * 32, "e" * 32, "f" * 32
 
@@ -49,7 +49,7 @@ class MethodOpsTests(unittest.TestCase):
             CREATE TABLE proposals(id TEXT,action TEXT,status TEXT,created REAL,expires REAL);
             CREATE TABLE deliveries(id TEXT,kind TEXT,status TEXT,created REAL,receipt TEXT);
             CREATE TABLE goals(id TEXT,scope TEXT,title TEXT,why TEXT,status TEXT,next_step TEXT,run_id TEXT,updated_at REAL);
-            INSERT INTO goals VALUES('running-goal','qq:FriendMessage:12345','研究','继续','running','整理','live-run',20);
+            INSERT INTO goals VALUES('running-goal','telegram:FriendMessage:12345','研究','继续','running','整理','live-run',20);
             """)
             if methods:
                 db.executescript("""

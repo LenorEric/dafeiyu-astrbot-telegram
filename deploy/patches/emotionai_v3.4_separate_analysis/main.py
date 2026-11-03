@@ -554,8 +554,8 @@ class EmotionAIPlugin(Star):
         self.change_min = self.config.get("change_min", -10)
         self.change_max = self.config.get("change_max", 5)
 
-        raw_list = self.config.get("admin_qq_list", [])
-        self.admin_qq_list = [str(qq) for qq in raw_list if str(qq).isdigit()]
+        raw_list = self.config.get("admin_user_ids", [])
+        self.admin_user_ids = [str(uid) for uid in raw_list if str(uid).isdigit()]
         self.plugin_priority = self.config.get("plugin_priority", 100000)
 
         # 情感分析从主回复中拆出：主聊天只负责自然语言回复，
@@ -627,7 +627,7 @@ class EmotionAIPlugin(Star):
 
     def _is_admin(self, event: AstrMessageEvent) -> bool:
         """检查是否为管理员"""
-        return event.role == "admin" or event.get_sender_id() in self.admin_qq_list
+        return event.role == "admin" or event.get_sender_id() in self.admin_user_ids
 
     def _create_backup(self) -> str:
         """创建数据备份"""

@@ -1,8 +1,6 @@
-# 主动联系协调 v0.1
+> Telegram 专用版本。本文不构成真实账号联调记录；配置与验收以部署指南和验证报告为准。
 
-2026-10-30，已在云端部署并开启协调；proactive_chat 社区补丁也已安装，额度设为 1/120/5/1。真实 QQ 联动 smoke 尚未执行（当前处于 23:00–08:00 免打扰）。接续[生活决策](LIFE_DECISION_V01.md)：
-让她保留自己的活动，又能在刚分享过、主人正在聊天或连续没有回应时安静下来。
-本阶段协调联系时机，不增加定时任务，不生成虚构经历，不改变人格。
+# 主动联系协调 v0.1
 
 ## 已实现的范围
 
@@ -33,8 +31,6 @@
 共享层使用原 `owner_scope` / `owner_id` 和 `dnd_ranges`。不推断新的免打扰时段。
 不要求开启 B站公开写操作；生活侧仍必须通过现有 enabled、life、goal、methods、审批等检查。
 
-2026-10-30 已执行以下配置（实际额度 1、间隔 120、主人留白 5、未回应 1）：
-
 ```bash
 python ops.py --data-dir <原B站插件数据目录> configure --contact-daily-limit 1 --contact-cooldown-minutes 120 --contact-unanswered-limit 1
 python ops.py --data-dir <原B站插件数据目录> switch contact_coordination_enabled on
@@ -54,7 +50,7 @@ SQLite 事务先预留容量，再发生网络等待；另一入口/另一连接
 | --- | --- |
 | `reserved` | 已预留，未进入发送 |
 | `dispatching` | 可能开始发送；按已用容量计算 |
-| `sent` | 生活侧原 QQDelivery 返回消息 ID，不额外宣称人已阅读 |
+| `sent` | 生活侧原 TelegramDelivery 返回消息 ID，不额外宣称人已阅读 |
 | `reported` | 社区发送器返回 True，没有消息 ID/独立回读证明 |
 | `uncertain` | 发送后取消、返回失败或结果无法确定；不授权自动补发 |
 | `cancelled` | 在发送前取消，不计已用容量 |
@@ -87,44 +83,36 @@ SQLite 事务先预留容量，再发生网络等待；另一入口/另一连接
 
 ## 离线验证
 
-使用临时 SQLite、假的 QQ/TTS/模型与临时安装目录；未读取真实 B站凭据、未调用真实写接口。
+使用临时 SQLite、假的 Telegram/TTS/模型与临时安装目录；未读取真实 B站凭据、未调用真实写接口。
 社区测试执行补丁中的 SenderService/LlmService 方法，框架对象为替身，不代表真实 AstrBot 插件加载已验收。
 
 ```powershell
 $env:Path = 'C:\Program Files\Git\bin;' + $env:Path
-& 'C:\Users\ACER\AppData\Local\Temp\dafeiyu-venv\Scripts\python.exe' -B -m unittest discover -s tests -p 'test_bili_contact*.py' -v
-& 'C:\Users\ACER\AppData\Local\Temp\dafeiyu-venv\Scripts\python.exe' -B -m unittest discover -s tests -p 'test_bili_*.py' -v
+& '<本机Python路径>' -B -m unittest discover -s tests -p 'test_bili_contact*.py' -v
+& '<本机Python路径>' -B -m unittest discover -s tests -p 'test_bili_*.py' -v
 ```
 
 - 新增定向：`Ran 32 tests in 1.188s`，`OK`。
 - 修复后全量：`Ran 435 tests in 24.228s`，`OK (skipped=11)`。
 - 11 项 skip：6 项缺 ffmpeg、1 项 Windows 创建符号链接需权限、4 项只支持 Linux 的安全文件导出。
-- 全量日志：`C:\Users\ACER\AppData\Local\Temp\dafeiyu-contact-full.log`。
+- 全量日志：`<本机Python路径>`。
 - 初始基线：403 项，1 error、11 skip。旧 `test_success_only_counts_checked_distinct_goals_and_cannot_replay`
   触发“success needs a new work revision produced after method selection”；其模块单独复跑 19 项通过，
   本次最终全量也通过。代码比较条件涉及作品/方法选择时间，是否为 Windows 时钟粒度导致尚未证实。
   没有修改 methods.py 或放宽原断言；初始日志为同一 Temp 下 `dafeiyu-outreach-baseline.log`。
 - `git diff --check` 干净；transport/life/budget/agent_budget/workshop/methods/proxy/phone_video/media/login/persona 零改动。
-- 本阶段未运行 WSL/Linux；真实 QQ 回执、TTS/装饰器联动、插件热重载和长期跨日运行均 **UNVERIFIED**。
+- 本阶段未运行 WSL/Linux；真实 Telegram 回执、TTS/装饰器联动、插件热重载和长期跨日运行均 **UNVERIFIED**。
 
 新增测试覆盖：跨来源/跨连接抢占、上海午夜与跨日冷却、未回应限制、owner 事件去重、
 停用/免打扰复查、预留和发送后取消、重启未知结果防重、过期预留释放、生成前省调用、
 TTS/分段计数、主人插话、缺协调器、默认关闭、审批仍需主人确认、安装哈希/备份/回滚。
-
-## 部署记录（2026-10-30）
-
-- B站插件已部署 main `7912bcc`；备份 `bili-activity-20261029T163641.318699Z.tar.gz`。
-- proactive_chat 补丁已安装；备份 `.dafeiyu-contact-backup-20261029T163946620609Z`。
-- `contact_coordination_enabled=true`，`contact_daily_limit=1`、`contact_cooldown_minutes=120`、`contact_owner_quiet_minutes=5`、`contact_unanswered_limit=1`。
-- `enabled/periodic_enabled/life_enabled/life_decision_enabled` 仍为 true；proactive_chat 私聊已启用。
-- AstrBot 两插件加载正常，OneBot v11 适配器已连接；`contacts` 目前为空，真实发送 smoke 待免打扰结束后执行。
 
 ## 主人后续最小 smoke 与回滚
 
 1. 已完成：备份现有配置与 activity.sqlite3，社区补丁只读检查通过并已安装。
 2. 已完成：安装本次生活插件及社区补丁，保持 B站公开写入关闭，联系额度 1、间隔 120 分钟、未回应上限 1。
 3. 先由生活侧分享一个有真实来源的感想，再触发社区主动聊天；第二次不发送，账本来源/额度正确。
-4. 换一个测试日/独立临时配置反向验证社区先发；观察 reported 不冒充 QQ 已核验回执。
+4. 换一个测试日/独立临时配置反向验证社区先发；观察 reported 不冒充 Telegram 已核验回执。
 5. 主人在 TTS 合成或第一段后插话，确认剩余内容停下；确认前台正常聊天不受主动额度阻挡。
 6. 重启后额度/未知记录保留，免打扰和原审批仍有效；观察异常是否被原社区内部兜底重复发送。
 

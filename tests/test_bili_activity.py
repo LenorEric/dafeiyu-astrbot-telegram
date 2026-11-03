@@ -1,4 +1,4 @@
-"""Activity/consent regression tests. Fakes do not establish live QQ acceptance.
+"""Activity/consent regression tests. Fakes do not establish live Telegram acceptance.
 
 Run: .venv/bin/python tests/test_bili_activity.py
 """
@@ -89,8 +89,8 @@ def load_plugin():
 
 
 main = load_plugin()
-SCOPE = "qq:FriendMessage:12345"
-OTHER_SCOPE = "qq:GroupMessage:12345"
+SCOPE = "telegram:FriendMessage:12345"
+OTHER_SCOPE = "telegram:GroupMessage:12345"
 
 
 class StoreTests(unittest.TestCase):
@@ -138,7 +138,7 @@ class StoreTests(unittest.TestCase):
         self.store.finish_proposal(row["id"], {"verified": True})
         self.assertIsNone(self.store.decide(SCOPE, "12345", "可以", "e3"))
 
-    def test_duplicate_old_qq_answer_cannot_approve_new_proposal(self):
+    def test_duplicate_old_telegram_answer_cannot_approve_new_proposal(self):
         first = self.proposal()
         self.offer(first)
         self.store.decide(SCOPE, "12345", "可以", "same-event")
@@ -250,7 +250,7 @@ class StoreTests(unittest.TestCase):
 
 
 class FakeEvent:
-    def __init__(self, scope=SCOPE, user="12345", event_id="qq1", run_id=None, text=""):
+    def __init__(self, scope=SCOPE, user="12345", event_id="tg1", run_id=None, text=""):
         self.unified_msg_origin = scope
         self.message_obj = types.SimpleNamespace(message_id=event_id, message_str=text)
         self.message_str = text
@@ -353,14 +353,14 @@ class PluginTests(unittest.IsolatedAsyncioTestCase):
         face._asr_file.assert_not_called()
         self.assertEqual(self.plugin.store.history(SCOPE)[0]["subtitles"], payload["subtitles"])
 
-    async def test_tool_result_contains_image_without_sending_qq(self):
+    async def test_tool_result_contains_image_without_sending_telegram(self):
         path = Path(self.folder.name, "screen.jpg")
         path.write_bytes(b"image-content")
         shot = types.SimpleNamespace(path=str(path), captured_at=time.time(), mime_type="image/jpeg", video=None, video_verified=False)
         self.plugin.capture = AsyncMock(return_value=("new-shot", shot))
         result = await self.plugin.screen(FakeEvent())
         self.assertEqual([item.type for item in result.content], ["text", "image"])
-        self.assertFalse(json.loads(result.content[0].text)["qq_sent"])
+        self.assertFalse(json.loads(result.content[0].text)["telegram_sent"])
         self.delivery.send.assert_not_called()
 
     async def test_foreground_phone_wrapper_respects_actual_tool_schema(self):

@@ -151,7 +151,7 @@ class Store:
 
     def offered(self, proposal_id, receipt):
         if not receipt or not receipt.get("message_id"):
-            raise ValueError("proposal delivery needs QQ receipt")
+            raise ValueError("proposal delivery needs Telegram receipt")
         self.db.execute("UPDATE proposals SET status='offered',offer_receipt=? WHERE id=? AND status='draft'",
                         (canonical(receipt), proposal_id))
 

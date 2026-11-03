@@ -1,4 +1,4 @@
-"""Exercise the patched community sender class with fake QQ/TTS and temp state."""
+"""Exercise the patched community sender class with fake Telegram/TTS and temp state."""
 from __future__ import annotations
 import ast
 import asyncio
@@ -137,7 +137,7 @@ class BridgeTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_other_scope_does_not_consume_owner_capacity(self):
         self.setup_bridge()
-        self.assertTrue(await self.sender.send_proactive_message("qq:FriendMessage:999", "其他会话", self.event))
+        self.assertTrue(await self.sender.send_proactive_message("telegram:FriendMessage:999", "其他会话", self.event))
         self.assertEqual(self.status()["used"], 0)
 
     async def test_tts_and_text_share_one_reservation(self):

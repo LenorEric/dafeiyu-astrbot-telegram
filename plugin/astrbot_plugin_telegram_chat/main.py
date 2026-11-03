@@ -1,11 +1,4 @@
-"""把 LLM 回复中的 [表情名] 文字自动转换成真实 QQ 表情段。
-
-原理：QQ 只在"人手输入"时把 [旺柴] 这类文字渲染成表情，
-机器人发出的纯文本接收端只会看到字面量。本插件在消息发送前
-把 [名字] 替换为真正的 face 消息段（NapCat / OneBot v11）。
-字典来源：NapCat 内置 qface 表 + 社区 315 条 sysface 快照合并（414 条）。
-"""
-
+"""Telegram 聊天整形、Unicode 表情与受限媒体理解。"""
 import asyncio
 import base64
 import json
@@ -22,7 +15,7 @@ import aiohttp
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star, register
-from astrbot.core.message.components import At, Face, Image, Plain, Record, Reply, Video
+from astrbot.core.message.components import At, Image, Plain, Record, Reply, Video
 from astrbot.core.star.session_llm_manager import SessionServiceManager
 
 PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -43,7 +36,7 @@ DEFAULT_CONFIG = {
     "asr_model": "qwen3-asr-flash",
     "vl_model": "qwen3-vl-plus",
     "face_cooldown_minutes": 10,
-    "max_media_mb": 80,
+    "max_media_mb": 20,
     "video_timeout_s": 300,
     "video_max_duration_s": 300,
     "video_max_frames": 16,
@@ -154,12 +147,12 @@ async def run_bounded(
 
 
 @register(
-    "astrbot_plugin_face_convert",
+    "astrbot_plugin_telegram_chat",
     "dafeiyu-tools",
-    "把 LLM 回复中的 [流泪][doge] 等文字表情自动转换为真实 QQ 表情段",
-    "1.3.0",
+    "Telegram 媒体理解、Unicode 表情和会话语音控制",
+    "2.0.0",
 )
-class FaceConvertPlugin(Star):
+class TelegramChatPlugin(Star):
     # 静默暗号只在“整条回复就是它”时生效；正常解释这个标记时不能吞整条。
     NO_REPLY_RE = re.compile(
         r"(?:\s*[\[【]\s*NO[_ -]?REPLY\s*[\]】]\s*)+", re.IGNORECASE
@@ -172,16 +165,16 @@ class FaceConvertPlugin(Star):
 
     def __init__(self, context: Context, config: dict | None = None):
         super().__init__(context)
-        map_path = os.path.join(PLUGIN_DIR, "face_map.json")
+        map_path = os.path.join(PLUGIN_DIR, "emoji_map.json")
         with open(map_path, encoding="utf-8") as f:
-            self.face_map: dict[str, int] = json.load(f)
+            self.face_map: dict[str, str] = json.load(f)
         # 反向表：id -> 名字（用于把收到的表情翻译成文字喂给 LLM）
-        self.id2name: dict[int, str] = {}
+        self.id2name: dict[str, str] = {}
         for name, fid in self.face_map.items():
             self.id2name.setdefault(fid, name)
         # 手工优先级：通称覆盖
-        self.id2name[277] = "旺柴"
-        self.id2name[179] = "doge"
+
+
         self.pattern = re.compile(r"\[([^\[\]]{1,8})\]")
         # 轻量配置：同目录 config.json 可覆盖（缺省即默认值）
         self.cfg = DEFAULT_CONFIG.copy()
@@ -273,13 +266,13 @@ class FaceConvertPlugin(Star):
         return None
 
     async def _transcribe_voice(self, event: AstrMessageEvent, rec) -> str | None:
-        """语音消息 -> 文字：本地 WAV -> 直链下载 -> NapCat 转码 -> 百炼 ASR"""
+        """语音消息 -> 文字：本地 WAV -> 直链下载 -> Telegram 适配器 转码 -> 百炼 ASR"""
         if not self.asr_key:
             return None
         try:
             # 1) AstrBot PreProcessStage 已用 ensure_wav 转好标准 WAV，
-            #    rec.path / rec.file 就是本地文件。直接读，既省一次 NapCat 往返，
-            #    也避开新版 NapCat get_record 的 PayloadSchema 校验（retcode 1400）。
+            #    rec.path / rec.file 就是本地文件。直接读，既省一次 Telegram 适配器 往返，
+            #    也避开新版 Telegram 适配器 get_record 的 PayloadSchema 校验（retcode 1400）。
             local = self._existing_audio(rec)
             if local:
                 return await self._asr_file(local)
@@ -315,48 +308,9 @@ class FaceConvertPlugin(Star):
                         except OSError:
                             pass
 
-            # 3) 兜底：让 NapCat 转码（旧版本或本地文件缺失时）
-            try:
-                resp = await event.bot.get_record(file=file_ref, out_format="mp3")
-            except Exception:
-                resp = await event.bot.get_record(file=file_ref)
-            mp3 = None
-            if isinstance(resp, dict):
-                mp3 = (resp.get("data") or {}).get("file") or resp.get("file")
-            if not mp3:
-                return None
-            # 解析到本地文件
-            path = file_uri_to_path(mp3)
-            tmp_owned = False  # 自己下载的临时文件，用完负责清理
-            if path.startswith("http"):
-                async with aiohttp.ClientSession() as sess:
-                    body = await download_capped(
-                        sess,
-                        path,
-                        max_bytes=int(self.cfg.get("max_media_mb", 20)) * 1024 * 1024,
-                        timeout_total=30,
-                    )
-                if not body:
-                    return None
-                tmp = os.path.join(
-                    tempfile.gettempdir(), f"asr_{int(time.time() * 1000)}.mp3"
-                )
-                with open(tmp, "wb") as f:
-                    f.write(body)
-                tmp_owned = True
-            else:
-                tmp = path
-            # 转写
-            try:
-                return await self._asr_file(tmp)
-            finally:
-                if tmp_owned:
-                    try:
-                        os.remove(tmp)
-                    except OSError:
-                        pass
+            return None
         except Exception as e:
-            logger.warning(f"[face_convert] 语音转写失败: {str(e)[:150]}")
+            logger.warning(f"[face_convert] 语音转写失败: {type(e).__name__}")
             return None
 
     @staticmethod
@@ -477,7 +431,7 @@ class FaceConvertPlugin(Star):
             complete = True
             return vf
         except Exception as e:
-            logger.info(f"[face_convert] 下载失败: {str(e)[:80]}")
+            logger.info(f"[face_convert] 下载失败: {type(e).__name__}")
             return None
         finally:
             if not complete:
@@ -487,14 +441,10 @@ class FaceConvertPlugin(Star):
                     pass
 
     async def _resolve_video(self, event: AstrMessageEvent, comp, tmpdir: str) -> str | None:
-        """把视频字段解析成本地文件（多候选兜底：url -> 路径 -> 凭单号找 NapCat 要）。"""
+        """从适配器提供的 URL 或本地路径解析视频。"""
         file_f = getattr(comp, "file", None)
         url_f = getattr(comp, "url", None)
         path_f = getattr(comp, "path", None)
-        logger.info(
-            f"[face_convert] 视频字段: file={str(file_f)[:70]!r} "
-            f"url={str(url_f)[:70]!r} path={str(path_f)[:70]!r}"
-        )
         cands = []
         for f in (url_f, path_f, file_f):
             if f and str(f).strip() and str(f).strip() not in cands:
@@ -507,27 +457,7 @@ class FaceConvertPlugin(Star):
                     return vf
             elif os.path.exists(p):
                 return p
-            else:
-                # 光杆文件名 -> 凭单号找 NapCat 提货
-                try:
-                    resp = await event.bot.get_file(file=cand)
-                    d = resp.get("data") if isinstance(resp, dict) else None
-                    rp = None
-                    if isinstance(d, dict):
-                        rp = d.get("file") or d.get("path") or d.get("url")
-                    if not rp and isinstance(resp, dict):
-                        rp = resp.get("file") or resp.get("url")
-                    if rp:
-                        rp = file_uri_to_path(rp)
-                        logger.info(f"[face_convert] NapCat 提货: {rp[:90]}")
-                        if rp.startswith("http"):
-                            vf = await self._download_ok(rp, tmpdir)
-                            if vf:
-                                return vf
-                        elif os.path.exists(rp):
-                            return rp
-                except Exception as e:
-                    logger.info(f"[face_convert] get_file({cand[:40]}) 失败: {str(e)[:80]}")
+
         return None
 
     async def _run_ffmpeg(self, ff: str, *args: str, timeout: float = 60):
@@ -555,7 +485,7 @@ class FaceConvertPlugin(Star):
         if not video:
             result.notes.append("下载失败或文件超过大小限制")
             return
-        # NapCat 共享的本地文件也执行大小检查，但只清理本插件创建的文件。
+        # Telegram 适配器 共享的本地文件也执行大小检查，但只清理本插件创建的文件。
         if os.path.getsize(video) > self.cfg["max_media_mb"] * 1024 * 1024:
             result.notes.append("文件超过大小限制")
             return
@@ -659,7 +589,7 @@ class FaceConvertPlugin(Star):
 
     @filter.event_message_type(filter.EventMessageType.ALL)
     async def inbound_face_to_text(self, event: AstrMessageEvent):
-        """把收到的 QQ 表情翻译成 [名字] 文本。
+        """把收到的 Telegram 表情翻译成 [名字] 文本。
 
         纯表情消息的 message_str 为空，上游会当"空消息"处理导致她装死不回；
         这里把表情名拼进文本，让整条链路正常运转。
@@ -680,14 +610,14 @@ class FaceConvertPlugin(Star):
                     f"[face_convert] 收到打断指令「{raw}」，已停止 {stopped} 条旧回复"
                 )
         except Exception as e:
-            logger.debug(f"[face_convert] 打断处理失败: {str(e)[:80]}")
+            logger.debug(f"[face_convert] 打断处理失败: {type(e).__name__}")
 
         try:
             comps = event.get_messages()
         except Exception:
             return
         # 验尸记录仪：遇到不认识的组件类型就备案（排查神秘消息用）
-        known = (Face, Image, Record, Video, Plain)
+        known = (At, Reply, Image, Record, Video, Plain)
         unknown = [type(c).__name__ for c in comps if not isinstance(c, known)]
         if unknown:
             logger.info(f"[face_convert] 未知消息组件: {unknown}")
@@ -696,9 +626,7 @@ class FaceConvertPlugin(Star):
         recs = []
         vids = []
         for c in comps:
-            if isinstance(c, Face):
-                names.append(f"[{self.id2name.get(c.id, f'表情{c.id}')}]")
-            elif isinstance(c, Image):
+            if isinstance(c, Image):
                 img_count += 1
             elif isinstance(c, Record):
                 recs.append(c)
@@ -736,10 +664,10 @@ class FaceConvertPlugin(Star):
             extra = " ".join(names)
             if extra not in (event.message_str or ""):
                 event.message_str = ((event.message_str or "") + " " + extra).strip()
-                logger.info(f"[face_convert] 收信翻译: {extra}")
+                logger.debug("[telegram_chat] 媒体预处理完成")
 
         # 身份标记（只进她的上下文，对方看不到字面量）：
-        # 群聊 -> [昵称(QQ号)]，管理员标「主人」；陌生人私聊 -> [主人的朋友 昵称(QQ号)]
+        # 群聊 -> [昵称(Telegram号)]，管理员标「主人」；陌生人私聊 -> [主人的朋友 昵称(Telegram号)]
         try:
             if not event.get_extra("_fy_tagged"):
                 sid = str(event.get_sender_id())
@@ -771,7 +699,7 @@ class FaceConvertPlugin(Star):
                         event.set_extra("_fy_tagged", True)
                         logger.info(f"[face_convert] 群聊空唤醒标记: {tag}")
         except Exception as e:
-            logger.warning(f"[face_convert] 身份标记失败: {str(e)[:100]}")
+            logger.warning(f"[face_convert] 身份标记失败: {type(e).__name__}")
 
     # 嘴硬橡皮擦：只擦「隐约听见/看到…」这种回声腔。
     # “看不清/没听清/模模糊糊”是诚实的不确定性说明，必须保留；
@@ -813,7 +741,7 @@ class FaceConvertPlugin(Star):
             saved.append(match.group(0))
             return f"\x00{len(saved) - 1}\x00"
 
-        return FaceConvertPlugin._PROTECT_INLINE.sub(repl, text), saved
+        return TelegramChatPlugin._PROTECT_INLINE.sub(repl, text), saved
 
     @staticmethod
     def _restore_inline(text: str, saved: list[str]) -> str:
@@ -1030,7 +958,7 @@ class FaceConvertPlugin(Star):
                     if re.fullmatch(r"[A-Za-z一-鿿]{1,6}", name):
                         if m.start() > pos:
                             new_chain.append(Plain(text[pos : m.start()]))
-                        new_chain.append(Plain(name))
+                        new_chain.append(Plain(m.group(0)))
                         pos = m.end()
                         stripped += 1
                     continue
@@ -1049,7 +977,7 @@ class FaceConvertPlugin(Star):
                     continue
                 if m.start() > pos:
                     new_chain.append(Plain(text[pos : m.start()]))
-                new_chain.append(Face(id=fid))
+                new_chain.append(Plain(fid))
                 hist.append((fid, time.time()))
                 del hist[:-8]
                 per_msg += 1
@@ -1061,14 +989,14 @@ class FaceConvertPlugin(Star):
         if changed or stripped or dropped_faces:
             result.chain = new_chain
             logger.info(
-                f"[face_convert] 已转换 {changed} 个文字表情 -> 真实表情段"
+                f"[face_convert] 已转换 {changed} 个文字表情 -> Unicode emoji"
                 + (f"，脱括号 {stripped} 个（字典不认的）" if stripped else "")
                 + (f"，冷却丢弃 {dropped_faces} 个" if dropped_faces else "")
             )
 
     # ---------------- 语音开关（会话级，走 AstrBot 官方会话配置） ----------------
 
-    @filter.command("语音开")
+    @filter.command("voice_on", alias={"语音开"})
     async def voice_on(self, event: AstrMessageEvent):
         """开启本会话的语音条。"""
         await SessionServiceManager.set_tts_status_for_session(
@@ -1076,7 +1004,7 @@ class FaceConvertPlugin(Star):
         )
         yield event.plain_result("开麦！想听我说话就多喊我两句呀~")
 
-    @filter.command("语音关")
+    @filter.command("voice_off", alias={"语音关"})
     async def voice_off(self, event: AstrMessageEvent):
         """关闭本会话的语音条（文字照常聊）。"""
         await SessionServiceManager.set_tts_status_for_session(
@@ -1084,7 +1012,7 @@ class FaceConvertPlugin(Star):
         )
         yield event.plain_result("好嘛好嘛，我先闭嘴，文字照聊！（小声嘟囔）")
 
-    @filter.command("语音状态")
+    @filter.command("voice_status", alias={"语音状态"})
     async def voice_status(self, event: AstrMessageEvent):
         """查询本会话的语音条开关状态。"""
         on = await SessionServiceManager.is_tts_enabled_for_session(

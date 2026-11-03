@@ -23,7 +23,7 @@ for name in ("core", "workshop", "methods"):
     spec.loader.exec_module(module)
     globals()[name] = module
 
-SCOPE, OTHER = "qq:FriendMessage:12345", "qq:GroupMessage:12345"
+SCOPE, OTHER = "telegram:FriendMessage:12345", "telegram:GroupMessage:12345"
 STEPS = [{"kind": "gather", "instruction": "收集实际演示，记录时间范围"},
          {"kind": "review", "instruction": "把观察和推测分开，核对引用"}]
 

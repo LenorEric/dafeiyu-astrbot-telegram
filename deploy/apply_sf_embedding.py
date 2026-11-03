@@ -6,7 +6,7 @@
 旧记忆与知识库**无需重新嵌入**即可直接使用。
 
 用法：python3 apply_sf_embedding.py [data_dir]
-      data_dir 默认为 /opt/dafeiyu/astrbot/data
+      data_dir 默认为 /opt/dafeiyu/deploy/data
 幂等：可重复执行。
 
 说明：
@@ -20,7 +20,7 @@ import json
 import re
 import sys
 
-D = sys.argv[1] if len(sys.argv) > 1 else "/opt/dafeiyu/astrbot/data"
+D = sys.argv[1] if len(sys.argv) > 1 else "/opt/dafeiyu/deploy/data"
 
 # 1. 从插件配置里捞硅基流动 key（不打印明文）
 sfkey = None

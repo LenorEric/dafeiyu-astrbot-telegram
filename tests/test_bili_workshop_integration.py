@@ -1,6 +1,6 @@
-"""Learning/creation integration checks with fake model and QQ transports.
+"""Learning/creation integration checks with fake model and Telegram transports.
 
-These exercise the real controller and SQLite ledger, not a deployed QQ client.
+These exercise the real controller and SQLite ledger, not a deployed Telegram client.
 """
 import asyncio
 import hashlib

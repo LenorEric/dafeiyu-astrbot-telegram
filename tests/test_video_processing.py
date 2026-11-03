@@ -1,4 +1,4 @@
-"""真实 ffmpeg + 本地 HTTP 回归；不连接 QQ、不调用付费模型。
+"""真实 ffmpeg + 本地 HTTP 回归；不连接 Telegram、不调用付费模型。
 
 运行：python tests/test_video_processing.py
 需要 aiohttp（插件已有依赖）和 ffmpeg；其余仅用标准库。
@@ -52,7 +52,7 @@ def load_plugin():
         modules[name] = types.ModuleType(name)
         vars(modules[name]).update(attrs)
     spec = importlib.util.spec_from_file_location(
-        "video_test_plugin", ROOT / "plugin/astrbot_plugin_face_convert/main.py"
+        "video_test_plugin", ROOT / "plugin/astrbot_plugin_telegram_chat/main.py"
     )
     module = importlib.util.module_from_spec(spec)
     with patch.dict(sys.modules, modules):
@@ -65,7 +65,7 @@ logging.basicConfig(level=logging.CRITICAL)
 
 
 def plugin(**config):
-    instance = mod.FaceConvertPlugin(None)
+    instance = mod.TelegramChatPlugin(None)
     instance.cfg.update(config)
     instance.asr_key = "test-only"
     return instance
@@ -398,9 +398,9 @@ class HttpTests(unittest.IsolatedAsyncioTestCase):
 
 
 class VoiceTranscriptionTests(unittest.IsolatedAsyncioTestCase):
-    """语音转写优先级：本地 WAV -> 直链 -> NapCat get_record。"""
+    """语音转写优先级：本地 WAV -> 直链 -> Telegram 适配器 get_record。"""
 
-    async def test_local_wav_beats_napcat(self):
+    async def test_local_wav_beats_telegram_adapter(self):
         inst = plugin()
         inst._asr_file = AsyncMock(return_value="本地")
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
@@ -417,7 +417,7 @@ class VoiceTranscriptionTests(unittest.IsolatedAsyncioTestCase):
         inst._asr_file.assert_awaited_once_with(path)
         bot.get_record.assert_not_awaited()
 
-    async def test_url_download_beats_napcat(self):
+    async def test_url_download_beats_telegram_adapter(self):
         inst = plugin()
         inst._asr_file = AsyncMock(return_value="直链")
         rec = types.SimpleNamespace(
@@ -434,7 +434,7 @@ class VoiceTranscriptionTests(unittest.IsolatedAsyncioTestCase):
         bot.get_record.assert_not_awaited()
         self.assertTrue(inst._asr_file.await_args.args[0].endswith(".wav"))
 
-    async def test_get_record_fallback_still_works(self):
+    async def test_unresolved_file_does_not_call_legacy_api(self):
         inst = plugin()
         inst._asr_file = AsyncMock(return_value="兜底")
         rec = types.SimpleNamespace(path=None, file="abc.amr", url=None)
@@ -443,8 +443,8 @@ class VoiceTranscriptionTests(unittest.IsolatedAsyncioTestCase):
         )
         event = types.SimpleNamespace(bot=bot)
 
-        self.assertEqual(await inst._transcribe_voice(event, rec), "兜底")
-        bot.get_record.assert_awaited()
+        self.assertIsNone(await inst._transcribe_voice(event, rec))
+        bot.get_record.assert_not_awaited()
 
 
 if __name__ == "__main__":

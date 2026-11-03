@@ -36,7 +36,7 @@ class OpsTests(unittest.TestCase):
 
     def ready(self):
         self.run_ops("init")
-        self.run_ops("configure", "--owner-scope", "qq:FriendMessage:12345", "--owner-id", "12345",
+        self.run_ops("configure", "--owner-scope", "telegram:FriendMessage:12345", "--owner-id", "12345",
                      "--dnd-ranges", '[["23:00","08:00"]]')
 
     def evidence(self, *, status="completed", mode="autonomous", run_id="run-1", receipt=True):
@@ -46,15 +46,15 @@ class OpsTests(unittest.TestCase):
             CREATE TABLE runs(id TEXT,status TEXT,scope TEXT,started REAL,ended REAL);
             CREATE TABLE deliveries(scope TEXT,kind TEXT,status TEXT,created REAL,receipt TEXT,meta TEXT);
             """)
-            con.execute("INSERT INTO runs VALUES(?,?,?,?,?)", ("run-1", status, "qq:FriendMessage:12345", 100.0, 200.0))
+            con.execute("INSERT INTO runs VALUES(?,?,?,?,?)", ("run-1", status, "telegram:FriendMessage:12345", 100.0, 200.0))
             con.execute("INSERT INTO deliveries VALUES(?,?,?,?,?,?)", (
-                "qq:FriendMessage:12345", "screenshot", "sent", 150.0,
-                json.dumps({"message_id": "42", "verified": receipt, "image_readback": receipt}),
+                "telegram:FriendMessage:12345", "screenshot", "sent", 150.0,
+                json.dumps({"message_id": "42", "chat_id": "12345", "acknowledged": receipt, "photo_file_id": "photo-id" if receipt else None}),
                 json.dumps({"run_id": run_id, "share_mode": mode})))
             con.commit()
         path = self.root / "evidence.json"
         path.write_text(json.dumps({"run_id": "run-1", "read_content_verified": True,
-                                   "screenshot_opened": True, "qq_screenshot_message_id": "42"}))
+                                   "screenshot_opened": True, "telegram_screenshot_message_id": "42"}))
         return path
 
     def test_init_preserves_existing_user_config(self):
@@ -69,7 +69,7 @@ class OpsTests(unittest.TestCase):
         self.run_ops("init")
         with self.assertRaises(ValueError):
             self.run_ops("once")
-        self.run_ops("configure", "--owner-scope", "qq:FriendMessage:12345", "--owner-id", "12345")
+        self.run_ops("configure", "--owner-scope", "telegram:FriendMessage:12345", "--owner-id", "12345")
         with self.assertRaises(ValueError):
             self.run_ops("once")
         self.run_ops("configure", "--dnd-ranges", "[]")
@@ -95,7 +95,7 @@ class OpsTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.run_ops("accept-one-shot", "--evidence", str(path))
 
-    def test_missing_qq_readback_does_not_accept_run(self):
+    def test_missing_telegram_readback_does_not_accept_run(self):
         path = self.evidence(receipt=False)
         with self.assertRaises(ValueError):
             self.run_ops("accept-one-shot", "--evidence", str(path))

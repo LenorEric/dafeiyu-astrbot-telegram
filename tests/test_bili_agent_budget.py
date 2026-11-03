@@ -1,4 +1,4 @@
-"""Runner-local Provider accounting; no real model or QQ calls."""
+"""Runner-local Provider accounting; no real model or Telegram calls."""
 from __future__ import annotations
 
 import asyncio

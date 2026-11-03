@@ -29,11 +29,11 @@
         "default": 5,
         "hint": "限制 LLM 单次加分上限"
     },
-    "admin_qq_list": {
-        "description": "管理员QQ列表",
+    "admin_user_ids": {
+        "description": "管理员Telegram列表",
         "type": "list",
         "default": [],
-        "hint": "在此列表中的QQ号可以使用管理员命令"
+        "hint": "在此列表中的Telegram 数字用户 ID可以使用管理员命令"
     },
     "plugin_priority": {
         "description": "插件优先级",

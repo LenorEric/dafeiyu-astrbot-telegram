@@ -10,7 +10,7 @@ import re
 import sqlite3
 import time
 
-DEFAULT_DIR = "/opt/dafeiyu/astrbot/data/plugin_data/astrbot_plugin_bili_activity"
+DEFAULT_DIR = "/opt/dafeiyu/deploy/data/plugin_data/astrbot_plugin_bili_activity"
 ACTIONS = {"research", "writing", "explore", "rest"}
 
 
@@ -58,7 +58,7 @@ def read_activity(folder, *, now=None):
             raise ActivityError("invalid control size")
         cfg = obj(control.read_text(encoding="utf-8"))
         scope = cfg.get("owner_scope")
-        if not isinstance(scope, str) or not re.fullmatch(r"[^:]+:FriendMessage:\d+", scope) or scope.rsplit(":", 1)[1] != str(cfg.get("owner_id")):
+        if not isinstance(scope, str) or not re.fullmatch(r"telegram:FriendMessage:\d+", scope) or scope.rsplit(":", 1)[1] != str(cfg.get("owner_id")):
             raise ActivityError("owner scope is not configured")
         path = (root / "activity.sqlite3").resolve(strict=True)
         db = sqlite3.connect(path.as_uri() + "?mode=ro", uri=True, timeout=3)

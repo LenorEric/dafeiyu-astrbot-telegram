@@ -12,7 +12,6 @@
 *.juejin.cn
 *.163.com
 *.sina.com.cn
-*.qq.com
 *.sohu.com
 *.thepaper.cn
 *.xinhuanet.com

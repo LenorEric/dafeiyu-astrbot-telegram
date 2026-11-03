@@ -76,7 +76,7 @@ class ContactLedger:
         validate_config(cfg)
         if not cfg["contact_coordination_enabled"]:
             raise ContactBlocked("主动联系协调已关闭，本次安排取消")
-        if (scope != cfg["owner_scope"] or not re.fullmatch(r"[^:]+:FriendMessage:\d+", scope)
+        if (scope != cfg["owner_scope"] or not re.fullmatch(r"telegram:FriendMessage:\d+", scope)
                 or scope.rsplit(":", 1)[-1] != str(cfg["owner_id"])):
             raise ContactBlocked("主动联系仅用于已配置的主人私聊")
         if cfg["dnd_ranges"] is None or quiet_now(cfg["dnd_ranges"], datetime.fromtimestamp(now, ZoneInfo("Asia/Shanghai"))):

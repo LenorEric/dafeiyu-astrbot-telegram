@@ -1,45 +1,19 @@
-# 大肥鱼 · 云端部署编排（AstrBot + NapCat）
-# 用法：把 deploy/ 下的文件放到服务器 /opt/dafeiyu/，按需修改路径与账号后
-#       docker compose up -d
 services:
   astrbot:
-    build: .
-    image: dafeiyu-astrbot:latest
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: dafeiyu-telegram:local
     container_name: astrbot
     restart: unless-stopped
-    ports:
-      # 默认只绑本机，远程访问走 SSH 隧道：
-      #   ssh -L 6185:127.0.0.1:6185 root@<服务器>   然后开 http://127.0.0.1:6185
-      # 确需公网直连再改回 "6185:6185"（并配安全组、改强密码）
-      - "127.0.0.1:6185:6185"  # AstrBot 面板
-    volumes:
-      - /opt/dafeiyu/astrbot/data:/AstrBot/data
-      # 核心补丁用 bind-mount 接入：升级镜像不会覆盖（见 docs/踩坑合集）
-      - /opt/dafeiyu/patches/dashscope_tts.py:/AstrBot/astrbot/core/provider/sources/dashscope_tts.py:ro
-      - /opt/dafeiyu/patches/stage.py:/AstrBot/astrbot/core/pipeline/result_decorate/stage.py:ro
-      - /opt/dafeiyu/patches/respond_stage.py:/AstrBot/astrbot/core/pipeline/respond/stage.py:ro
-      - /opt/dafeiyu/patches/chat_layout.py:/AstrBot/astrbot/core/pipeline/chat_layout.py:ro
+    env_file: .env
     environment:
-      - TZ=Asia/Shanghai
-
-  napcat:
-    # 钉版：已验证组合（桌面端 NapCat 4.18.38；Docker 镜像发布滞后一版，取 v4.18.37）
-    image: mlikiowa/napcat-docker:v4.18.37
-    container_name: napcat
-    restart: unless-stopped
-    # 固定主机名：QQ 的设备名/指纹会带上 hostname。默认是随机容器 ID，
-    # 重建后会变成「新设备」，更容易触发风控、要求重新扫码。
-    hostname: dafeiyu-napcat
+      TZ: Asia/Shanghai
+      DAFEIYU_TELEGRAM_GUARD: '1'
+      PYTHONPATH: /opt/dafeiyu/deploy/telegram
     ports:
-      - "127.0.0.1:6099:6099"  # NapCat WebUI（默认仅本机；SSH 隧道访问，公网改法同上）
+      - '127.0.0.1:6185:6185'
     volumes:
-      - /opt/dafeiyu/napcat/config:/app/napcat/config
-      - /opt/dafeiyu/napcat/qq:/app/.config/QQ
-      # 可选：连 machine-id 一起固定（社区经验，非官方机制）。
-      # 启用前先在宿主机创建文件，否则 Docker 会把它建成目录、容器起不来：
-      #   cat /proc/sys/kernel/random/uuid > /opt/dafeiyu/napcat/machine-id
-      # - /opt/dafeiyu/napcat/machine-id:/etc/machine-id:ro
-    environment:
-      - TZ=Asia/Shanghai
-      - ACCOUNT=your_qq_account            # Docker 入口脚本用 -q 快速登录（不是 NAPCAT_ACCOUNT）
-      - NAPCAT_QUICK_ACCOUNT=your_qq_account  # Worker 重启后自动尝试快速登录
+      - ./data:/AstrBot/data
+    entrypoint: ['python', '/opt/dafeiyu/deploy/telegram/run.py']
+    working_dir: /AstrBot

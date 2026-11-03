@@ -36,4 +36,4 @@ asyncio.run(main())
 '@
 $probe | & $python -
 if ($LASTEXITCODE -ne 0) { throw "Bilibili MCP is not ready" }
-Write-Output "This verifies the local companion only; cloud proxy, AstrBot and QQ receipt still need end-to-end checks."
+Write-Output "This verifies the local companion only; cloud proxy, AstrBot and Telegram receipt still need end-to-end checks."

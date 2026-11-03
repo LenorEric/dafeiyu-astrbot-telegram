@@ -25,7 +25,7 @@ package.__path__ = [str(Path(__file__).resolve().parents[1] / "plugin/astrbot_pl
 sys.modules[PACKAGE] = package
 core = importlib.import_module(PACKAGE + ".core")
 contacts = importlib.import_module(PACKAGE + ".contact")
-SCOPE = "qq:FriendMessage:12345"
+SCOPE = "telegram:FriendMessage:12345"
 
 
 class ReaderTests(unittest.TestCase):
@@ -104,7 +104,7 @@ class ReaderTests(unittest.TestCase):
 
     def test_other_scope_and_sensitive_metadata_never_leave_reader(self):
         self.decision()
-        self.decision(scope="qq:GroupMessage:999")
+        self.decision(scope="telegram:GroupMessage:999")
         self.store.db.execute("UPDATE events SET details=? WHERE scope<>?", (json.dumps({"action":"writing","reason":"FOREIGN-PRIVATE","run_id":"other"}),SCOPE))
         result = json.dumps(self.read())
         for forbidden in ("FOREIGN-PRIVATE", "TOKEN-MUST-NOT-LEAVE", "RAW-RESPONSE-MUST-NOT-LEAVE", SCOPE, "cookies", str(self.root)):
@@ -129,7 +129,7 @@ class ReaderTests(unittest.TestCase):
 
     def test_real_work_schema_is_scoped_and_pending_proposals_expose_no_payload(self):
         importlib.import_module(PACKAGE + ".workshop").Workshop(self.store)
-        for scope, ident, title in ((SCOPE,"own","自己的作品"),("qq:FriendMessage:9","other","FOREIGN-WORK")):
+        for scope, ident, title in ((SCOPE,"own","自己的作品"),("telegram:FriendMessage:9","other","FOREIGN-WORK")):
             self.store.db.execute("INSERT INTO creative_works VALUES(?,?,?,?,?,?,?,?,?,?)", (
                 ident,scope,"goal",title,"write","draft",2,ident,self.now-60,self.now))
         self.store.db.execute("INSERT INTO proposals(id,scope,actor,action,args,fingerprint,status,created,expires) VALUES(?,?,?,?,?,?,?,?,?)", (
@@ -168,7 +168,7 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual(self.read()["state"], "ended")
 
     def test_bad_config_missing_db_and_future_schema_fail_closed(self):
-        self.cfg["owner_scope"] = "qq:GroupMessage:12345"
+        self.cfg["owner_scope"] = "telegram:GroupMessage:12345"
         self.write_config()
         with self.assertRaises(ActivityError): self.read()
         self.cfg["owner_scope"] = SCOPE

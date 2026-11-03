@@ -3,11 +3,7 @@ $ErrorActionPreference = "Stop"
 $Here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Server = Join-Path $Here "server.py"
 
-$Candidates = @(
-    "C:\Users\ACER\AppData\Local\Python\pythoncore-3.14-64\python.exe",
-    "C:\Users\ACER\miniconda3\python.exe"
-)
-$Python = $Candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+$Python = (Get-Command python -ErrorAction SilentlyContinue).Source
 if (-not $Python) {
     $Python = (Get-Command python -ErrorAction SilentlyContinue).Source
 }
@@ -26,18 +22,18 @@ if (-not $SshHost -and (Test-Path $HostFile)) {
 if (-not $SshHost) {
     throw "SSH host not set. Use DAFEIYU_SSH_HOST=root@host or write it to $HostFile"
 }
-$OwnerQq = $env:DAFEIYU_OWNER_QQ
-$BotQq = $env:DAFEIYU_BOT_QQ
+$OwnerQq = $env:DAFEIYU_OWNER_Telegram
+$BotQq = $env:DAFEIYU_BOT_Telegram
 
 Write-Host "Python: $Python"
 Write-Host "Server: $Server"
 Write-Host "Host:   $SshHost"
-Write-Host "Owner QQ env: $(if ($OwnerQq) { 'set' } else { 'not set' })"
-Write-Host "Bot QQ env:   $(if ($BotQq) { 'set' } else { 'not set' })"
+Write-Host "Owner Telegram env: $(if ($OwnerQq) { 'set' } else { 'not set' })"
+Write-Host "Bot Telegram env:   $(if ($BotQq) { 'set' } else { 'not set' })"
 
 $EnvArgs = @("--env", "DAFEIYU_SSH_HOST=$SshHost")
-if ($OwnerQq) { $EnvArgs += @("--env", "DAFEIYU_OWNER_QQ=$OwnerQq") }
-if ($BotQq) { $EnvArgs += @("--env", "DAFEIYU_BOT_QQ=$BotQq") }
+if ($OwnerQq) { $EnvArgs += @("--env", "DAFEIYU_OWNER_Telegram=$OwnerQq") }
+if ($BotQq) { $EnvArgs += @("--env", "DAFEIYU_BOT_Telegram=$BotQq") }
 
 # 幂等：先移除旧注册（不存在时忽略）
 & claude mcp remove dafeiyu-admin 2>$null | Out-Null
