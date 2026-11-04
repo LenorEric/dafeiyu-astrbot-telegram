@@ -78,7 +78,9 @@ Telegram 适配器用机器人用户名作为 `self_id`，引用作者却是数�
 
 不要提交 `.env`、`deploy/data`、根目录备份、`.venv`、`.runtime`、服务日志或试听文件。数据库和备份可能含有聊天、推理字段及其他凭证。对外分享日志时先脱敏 token、API key 和初始面板密码。
 
-需要检查下一次 DeepSeek 请求时，可在 `deploy/data/debug_api/` 创建空文件 `capture-next`（目录权限 700、文件权限 600）。原生入口在 HTTP 发送边界检查此标记，下一次发往官方 `/v1/chat/completions`、模型为 `deepseek-flash` 的请求会消耗标记，并在该目录的新子目录中保存 `request.log`、原样请求体 `request-body.json`、原样非流式响应体 `response-body.json` 和响应状态 `response.log`。认证头不采集；正文包含真实聊天、人格和推理，仅保存在本机且文件权限为 600。标记按 HTTP 尝试消费，失败不会自动再抓；流式响应仅记录状态，不额外读取响应流。若开启了主动对话，下一次主动调用也可能先消耗标记，可按请求正文核对目标消息。没有标记时不记录 API 内容，旧请求无法事后恢复为原始请求。
+DeepSeek 请求和原始响应现已默认记录到项目根目录 `logs/model-api.jsonl`，总量上限 1 MiB，按队列淘汰旧调用。查看与异常边界见 [API 日志说明](api-logging.md)。历史请求仅在仍有留存时可查，过去未采集的记录无法事后恢复。
+
+另保留手动一次性独立抓取：可在 `deploy/data/debug_api/` 创建空文件 `capture-next`（目录权限 700、文件权限 600）。下一次发往官方 `/v1/chat/completions`、模型为 `deepseek-flash` 的请求会消耗标记，在该目录的新子目录中保存请求体和非流式响应体。这份手动快照独立于默认队列，不受队列淘汰影响，需手动清理；日常调试优先使用默认有界日志。
 
 本地关键检查：
 

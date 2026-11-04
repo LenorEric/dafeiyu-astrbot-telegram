@@ -64,6 +64,8 @@ Breeze Blue 语音：在 `.env` 设置 `BREEZE_API_KEY` 和 `DAFEIYU_RARE_VOICE=
 
 原生服务使用 `journalctl -u dafeiyu -n 100 --no-pager` 查看日志；容器使用 `docker compose -f deploy/compose.yaml logs --tail 100 astrbot`。运行状态正常不代表收发链路已验证。真实验收依次测试文字、群触发、图片、语音、视频和主人截图确认。
 
+DeepSeek 完整 API 请求/响应默认保存到项目 `logs/model-api.jsonl`，总量上限 1 MiB，按队列淘汰旧调用。查看最新完整响应：`.venv/bin/python deploy/read-api-log.py --part response`；记录字段、超限处理及隐私说明见 [API 日志](../docs/api-logging.md)。
+
 备份需停止数据写入再打包 `deploy/data`、部署配置和补丁。配置包含凭证，备份按敏感文件保护，禁止上传公开位置。恢复到独立目录并确认无其他实例使用相同 token 后启动。
 
 `deploy/backup.sh` 使用 Docker 命令管理容器，只适用于 Compose 部署。原生部署应先 `systemctl stop dafeiyu`，再备份 `deploy/data`、配套插件/补丁和单独保护的 `.env`，完成后启动服务。恢复前停止机器人，恢复数据并确认凭证及群白名单，确保没有第二个实例使用相同 token。

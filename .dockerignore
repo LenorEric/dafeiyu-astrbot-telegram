@@ -11,3 +11,4 @@ deploy/.env
 backups
 DEPLOYMENT_STATUS.md
 plugin/**/config.json
+/logs/

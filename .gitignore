@@ -12,3 +12,4 @@ deploy/data/
 plugin/**/config.json
 /backups/
 /DEPLOYMENT_STATUS.md
+/logs/

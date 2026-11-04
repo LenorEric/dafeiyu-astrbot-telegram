@@ -2,10 +2,10 @@
 import os, runpy
 from init import initialize
 from pathlib import Path
+from api_log import install as install_api_log
+install_api_log(Path(__file__).resolve().parents[2] / 'logs' / 'model-api.jsonl')
 from api_capture import install as install_api_capture
 install_api_capture(Path(os.environ.get('DAFEIYU_DATA_DIR','/AstrBot/data')))
-from structured_output import install as install_structured_output
-install_structured_output()
 initialize(Path(os.environ.get('DAFEIYU_DATA_DIR','/AstrBot/data')),Path(os.environ.get('DAFEIYU_PLUGIN_SOURCE','/opt/dafeiyu/plugin')))
 from astrbot.core.platform.sources.telegram.tg_adapter import TelegramPlatformAdapter
 if os.environ.get('BREEZE_API_KEY'):
