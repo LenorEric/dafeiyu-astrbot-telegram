@@ -66,6 +66,7 @@ def main():
     subprocess.run([str(PYTHON), str(ROOT / 'deploy/native_audio.py')], check=True)
     for name, target in {
         'chat_layout.py': 'astrbot/core/pipeline/chat_layout.py',
+        'structured_reply.py': 'astrbot/core/pipeline/structured_reply.py',
         'stage.py': 'astrbot/core/pipeline/result_decorate/stage.py',
         'respond_stage.py': 'astrbot/core/pipeline/respond/stage.py',
         'dashscope_tts.py': 'astrbot/core/provider/sources/dashscope_tts.py',

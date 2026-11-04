@@ -18,7 +18,7 @@ from astrbot.core.star.star import star_map
 from astrbot.core.star.star_handler import EventType, star_handlers_registry
 from astrbot.core.utils.astrbot_path import get_astrbot_data_path
 
-from ..chat_layout import RareVoiceGate, is_valid_audio_file, make_tts_text
+from ..chat_layout import RareVoiceGate, group_bubbles, is_valid_audio_file, make_tts_text
 from ..context import PipelineContext
 from ..stage import Stage, register_stage, registered_stages
 
@@ -231,13 +231,21 @@ class ResultDecorateStage(Stage):
             full_reply_text = "".join(
                 comp.text for comp in result.chain if isinstance(comp, Plain)
             )
+            if event.get_extra('_fy_structured_reply') is not None:
+                # Keep deliberate pauses between bubbles when synthesizing one utterance.
+                full_reply_text = '\n\n'.join(
+                    ''.join(comp.text for comp in bubble if isinstance(comp, Plain))
+                    for bubble in group_bubbles(result.chain, Plain, Record, 6)
+                )
 
             # 分段回复
-            if self.enable_segmented_reply and event.get_platform_name() not in [
+            if (self.enable_segmented_reply
+                    and event.get_extra('_fy_structured_reply') is None
+                    and event.get_platform_name() not in [
 
                 "weixin_official_account",
                 "dingtalk",
-            ]:
+            ]):
                 if (
                     self.only_llm_result and result.is_model_result()
                 ) or not self.only_llm_result:

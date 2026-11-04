@@ -210,6 +210,18 @@ def group_bubbles(
 
         current = bubbles[-1]
 
+        # Structured replies carry explicit boundaries, including through emoji conversion.
+        bubble_id = getattr(comp, '_fy_bubble_id', None)
+        if bubble_id is not None and not _is_record(comp, record_type):
+            previous_id = next((getattr(c, '_fy_bubble_id', None)
+                                for c in reversed(current)
+                                if getattr(c, '_fy_bubble_id', None) is not None), None)
+            if previous_id != bubble_id or _is_record(current[-1], record_type):
+                bubbles.append([comp])
+            else:
+                current.append(comp)
+            continue
+
         if isinstance(comp, plain_type):
             # Text after a voice segment always starts a new bubble.
             if _is_record(current[-1], record_type):
